@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOut } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import Dashboard from "@/components/dashboard/Dashboard";
 
 const Index = () => {
   const { currentUser, userData } = useAuth();
@@ -24,28 +25,17 @@ const Index = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">AdPulse Analytics Dashboard</h1>
-      
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Welcome, {userData?.displayName || currentUser?.email}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>You are logged in as: {currentUser?.email}</p>
-          <Button className="mt-4" onClick={handleSignOut}>Sign Out</Button>
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dashboard Coming Soon</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>The complete analytics dashboard is under development.</p>
-          </CardContent>
-        </Card>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">AdPulse Analytics</h1>
+        <div className="flex items-center gap-4">
+          <span className="hidden md:inline text-sm text-muted-foreground">
+            Welcome, {userData?.displayName || currentUser?.email}
+          </span>
+          <Button size="sm" onClick={handleSignOut}>Sign Out</Button>
+        </div>
       </div>
+      
+      <Dashboard />
     </div>
   );
 };
