@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -841,3 +842,64 @@ const UploadPage = () => {
                 </div>
               </div>
             </div>
+            
+            <div>
+              <Label className="mb-2 block">Download Format</Label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Button
+                    variant={downloadFormat === "csv" ? "default" : "outline"}
+                    className={`w-full ${downloadFormat === "csv" ? "bg-adpulse-green text-[#021627]" : "bg-transparent border-white/20"}`}
+                    onClick={() => setDownloadFormat("csv")}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    CSV
+                  </Button>
+                </div>
+                <div className="flex-1">
+                  <Button
+                    variant={downloadFormat === "json" ? "default" : "outline"}
+                    className={`w-full ${downloadFormat === "json" ? "bg-adpulse-green text-[#021627]" : "bg-transparent border-white/20"}`}
+                    onClick={() => setDownloadFormat("json")}
+                  >
+                    <File className="h-4 w-4 mr-2" />
+                    JSON
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {downloadInProgress && (
+              <div className="mt-2">
+                <Label className="text-xs mb-1 block">Download Progress</Label>
+                <Progress value={downloadProgress} className="h-2" />
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setDownloadDialogOpen(false)}
+              disabled={downloadInProgress}
+              className="sm:w-auto w-full"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleHistoricalDownload}
+              disabled={downloadInProgress}
+              className="sm:w-auto w-full"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default UploadPage;
