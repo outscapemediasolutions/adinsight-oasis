@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   addDoc, 
@@ -607,11 +606,6 @@ export const getDateRange = async (userId: string) => {
     console.error("Error getting date range:", error);
     throw error;
   }
-};
-
-// Generate CSV template
-export const generateCSVTemplate = (): string => {
-  return csvHeaders.join(',');
 };
 
 // Delete ad data
