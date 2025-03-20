@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +15,8 @@ import {
   downloadHistoricalData,
   validateCSVHeaders,
   UploadRecord,
-  AdData
+  AdData,
+  csvHeaders
 } from "@/services/data";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -55,6 +55,7 @@ const UploadPage = () => {
   const [downloadInProgress, setDownloadInProgress] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [parsedPreview, setParsedPreview] = useState<AdData[] | null>(null);
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   
   // Fetch upload history when component mounts
   useEffect(() => {
@@ -175,6 +176,7 @@ const UploadPage = () => {
     setHeaderMismatch([]);
     setColumnMapping({});
     setParsedPreview(null);
+    setAvailableColumns([]);
   };
   
   const validateFile = async () => {
@@ -194,6 +196,14 @@ const UploadPage = () => {
           const csvText = e.target?.result as string;
           setCsvData(csvText);
           
+          // Extract available columns from the file for mapping
+          const lines = csvText.split('\n');
+          if (lines.length > 0) {
+            const fileHeaders = lines[0].split(',').map(header => header.trim());
+            setAvailableColumns(fileHeaders);
+            console.log("Available columns:", fileHeaders);
+          }
+          
           // Validate CSV headers first
           const headerValidation = validateCSVHeaders(csvText);
           
@@ -205,6 +215,7 @@ const UploadPage = () => {
             }))];
             
             if (mismatches.length > 0) {
+              console.log("Header mismatches found:", mismatches);
               setHeaderMismatch(mismatches);
               setColumnMappingOpen(true);
               setIsValidating(false);
@@ -268,6 +279,7 @@ const UploadPage = () => {
       }
     });
     
+    console.log("Applying column mapping:", newMapping);
     setColumnMapping(newMapping);
     setColumnMappingOpen(false);
     
@@ -605,41 +617,22 @@ const UploadPage = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/10">
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Date</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Date (YYYY-MM-DD)</td>
-                          <td className="px-4 py-3 text-sm text-white/70">The date for this data point</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Campaign name</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Text</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Name of the campaign</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Ad set name</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Text</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Name of the ad set</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Amount spent (INR)</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Number</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Total amount spent</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Impressions</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Number</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Number of impressions</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">CTR (all)</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Number (0-1)</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Click-through rate</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 text-sm">Purchase ROAS</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Number</td>
-                          <td className="px-4 py-3 text-sm text-white/70">Return on ad spend</td>
-                        </tr>
+                        {csvHeaders.map((header, index) => (
+                          <tr key={index}>
+                            <td className="px-4 py-3 text-sm">{header}</td>
+                            <td className="px-4 py-3 text-sm text-white/70">
+                              {header.toLowerCase().includes('date') ? 'Date (YYYY-MM-DD)' : 
+                               header.toLowerCase().includes('name') ? 'Text' :
+                               header.toLowerCase().includes('status') || header.toLowerCase().includes('level') ? 'Text' :
+                               header.toLowerCase().includes('roas') || header.toLowerCase().includes('cost') || 
+                               header.toLowerCase().includes('cpc') || header.toLowerCase().includes('cpm') || 
+                               header.toLowerCase().includes('ctr') ? 'Number' : 'Number'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-white/70">
+                              {header} data from Meta Ads
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -766,7 +759,7 @@ const UploadPage = () => {
                   <div>
                     <Label className="mb-1 block">Map From</Label>
                     <Select
-                      value={mismatch.original || "none"} // Fix: Ensure value is never an empty string
+                      value={mismatch.original || "none"} 
                       onValueChange={(value) => {
                         const updated = [...headerMismatch];
                         updated[index].original = value === "none" ? "" : value;
@@ -778,14 +771,9 @@ const UploadPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {/* This would be populated with actual column headers from the file */}
-                        <SelectItem value="Date">Date</SelectItem>
-                        <SelectItem value="Campaign">Campaign</SelectItem>
-                        <SelectItem value="Ad Set">Ad Set</SelectItem>
-                        <SelectItem value="Amount">Amount</SelectItem>
-                        <SelectItem value="Impressions">Impressions</SelectItem>
-                        <SelectItem value="CTR">CTR</SelectItem>
-                        <SelectItem value="ROAS">ROAS</SelectItem>
+                        {availableColumns.map((column, idx) => (
+                          <SelectItem key={idx} value={column}>{column}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -864,42 +852,4 @@ const UploadPage = () => {
                   >
                     <File className="h-4 w-4 mr-2" />
                     JSON
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            {downloadInProgress && (
-              <div className="mt-2">
-                <Label className="text-xs mb-1 block">Download Progress</Label>
-                <Progress value={downloadProgress} className="h-2" />
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setDownloadDialogOpen(false)}
-              disabled={downloadInProgress}
-              className="sm:w-auto w-full"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleHistoricalDownload}
-              disabled={downloadInProgress}
-              className="sm:w-auto w-full"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default UploadPage;
+                  </
