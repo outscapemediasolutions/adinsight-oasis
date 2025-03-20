@@ -6,10 +6,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
-import Index from "./pages/Index";
+import AppLayout from "./components/layout/AppLayout";
+import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Upload from "./pages/Upload";
+import Team from "./pages/Team";
+import Settings from "./pages/Settings";
+import Analytics from "./pages/Analytics";
+import Reports from "./pages/Reports";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -17,35 +24,55 @@ const queryClient = new QueryClient();
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading } = useAuth();
   
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center text-white bg-[#021627]">Loading...</div>;
   
   if (!currentUser) return <Navigate to="/login" />;
   
   return <>{children}</>;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+// Set dark mode by default
+const setInitialTheme = () => {
+  document.documentElement.classList.add("dark");
+};
+
+const App = () => {
+  useEffect(() => {
+    setInitialTheme();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="upload" element={<Upload />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="team" element={<Team />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="reports" element={<Reports />} />
+              </Route>
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
