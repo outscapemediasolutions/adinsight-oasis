@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -338,7 +337,7 @@ const UploadPage = () => {
       navigate("/");
     } catch (error) {
       console.error("Error uploading data:", error);
-      toast.error("Failed to upload data");
+      toast.error("Failed to upload data: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setIsUploading(false);
     }
@@ -766,10 +765,10 @@ const UploadPage = () => {
                   <div>
                     <Label className="mb-1 block">Map From</Label>
                     <Select
-                      value={mismatch.original}
+                      value={mismatch.original || "none"} // Fix: Ensure value is never an empty string
                       onValueChange={(value) => {
                         const updated = [...headerMismatch];
-                        updated[index].original = value;
+                        updated[index].original = value === "none" ? "" : value;
                         setHeaderMismatch(updated);
                       }}
                     >
@@ -777,7 +776,7 @@ const UploadPage = () => {
                         <SelectValue placeholder="Select a column" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {/* This would be populated with actual column headers from the file */}
                         <SelectItem value="Date">Date</SelectItem>
                         <SelectItem value="Campaign">Campaign</SelectItem>
@@ -842,57 +841,3 @@ const UploadPage = () => {
                 </div>
               </div>
             </div>
-            
-            <div>
-              <Label className="mb-2 block">Download Format</Label>
-              <RadioGroup 
-                value={downloadFormat}
-                onValueChange={(value) => setDownloadFormat(value as "csv" | "json")}
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="csv" id="csv" />
-                  <Label htmlFor="csv">CSV</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="json" id="json" />
-                  <Label htmlFor="json">JSON</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
-            {downloadInProgress && (
-              <div className="space-y-2">
-                <Label className="text-sm text-white/60">Download Progress</Label>
-                <Progress value={downloadProgress} max={100} className="h-2" />
-                <p className="text-xs text-white/60 text-right">{downloadProgress}%</p>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setDownloadDialogOpen(false)}
-              disabled={downloadInProgress}
-              className="sm:w-auto w-full"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleHistoricalDownload}
-              disabled={downloadInProgress || !selectedUpload}
-              className="sm:w-auto w-full"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {downloadInProgress ? "Downloading..." : "Download"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default UploadPage;

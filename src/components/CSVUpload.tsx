@@ -66,27 +66,33 @@ const CSVUpload = () => {
             return;
           }
           
-          const data = parseCSVData(csvData);
-          
-          if (data.length === 0) {
-            setParseError("No valid data found in the CSV file.");
-            toast.error("No valid data found in the CSV file.");
-          } else {
-            // Check for warnings
-            const warnings = [];
-            if (data.some(row => row.amountSpent === 0)) {
-              warnings.push("Some rows have 0 amount spent.");
-            }
-            if (data.some(row => row.impressions < 100)) {
-              warnings.push("Some campaigns have very low impressions (<100).");
-            }
+          try {
+            const data = parseCSVData(csvData);
             
-            setValidationWarnings(warnings);
-            setParsedData(data);
-            setDialogOpen(true);
+            if (data.length === 0) {
+              setParseError("No valid data found in the CSV file.");
+              toast.error("No valid data found in the CSV file.");
+            } else {
+              // Check for warnings
+              const warnings = [];
+              if (data.some(row => row.amountSpent === 0)) {
+                warnings.push("Some rows have 0 amount spent.");
+              }
+              if (data.some(row => row.impressions < 100)) {
+                warnings.push("Some campaigns have very low impressions (<100).");
+              }
+              
+              setValidationWarnings(warnings);
+              setParsedData(data);
+              setDialogOpen(true);
+            }
+          } catch (parseError) {
+            console.error("CSV parse error:", parseError);
+            setParseError((parseError as Error).message);
+            toast.error((parseError as Error).message);
           }
         } catch (error) {
-          console.error("CSV parse error:", error);
+          console.error("CSV validation error:", error);
           setParseError((error as Error).message);
           toast.error((error as Error).message);
         } finally {
@@ -116,14 +122,18 @@ const CSVUpload = () => {
     setIsUploading(true);
     
     try {
+      console.log("Starting upload with data:", parsedData.length, "records");
+      
       await saveAdData(parsedData, currentUser.uid, overwrite, file?.name || "upload.csv");
+      console.log("Upload completed successfully");
+      
       resetForm();
       setDialogOpen(false);
       toast.success("Data uploaded successfully!");
       navigate("/");
     } catch (error) {
       console.error("Firebase upload error:", error);
-      toast.error("Failed to upload data to the database.");
+      toast.error("Failed to upload data to the database: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setIsUploading(false);
     }

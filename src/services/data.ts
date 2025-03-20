@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   addDoc, 
@@ -262,6 +263,8 @@ export const saveAdData = async (
   fileName: string = "data-upload.csv"
 ) => {
   try {
+    console.log(`Starting saveAdData: ${data.length} records, overwrite=${overwrite}`);
+    
     // Start by creating an upload record
     const uploadRecord = {
       userId,
@@ -275,7 +278,9 @@ export const saveAdData = async (
       }
     };
     
+    console.log("Creating upload record");
     const uploadRef = await addDoc(collection(db, "uploads"), uploadRecord);
+    console.log("Upload record created with ID:", uploadRef.id);
     
     // Check for existing data with same date, campaign, and ad set
     let savedCount = 0;
@@ -311,6 +316,8 @@ export const saveAdData = async (
         savedCount++;
       }
     }
+    
+    console.log(`Completed processing: Saved ${savedCount}, Skipped ${skippedCount}`);
     
     // Update the upload record with final status
     await updateDoc(doc(db, "uploads", uploadRef.id), {
