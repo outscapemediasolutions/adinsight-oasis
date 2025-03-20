@@ -8,10 +8,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { parseCSVData, saveAdData, generateCSVTemplate, AdData } from "@/services/data";
+import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData } from "@/services/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { Upload, Download, AlertTriangle, X, Check, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const CSVUpload = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -20,7 +21,9 @@ const CSVUpload = () => {
   const [parsedData, setParsedData] = useState<AdData[] | null>(null);
   const [overwrite, setOverwrite] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   
   const { currentUser } = useAuth();
   
@@ -31,6 +34,7 @@ const CSVUpload = () => {
       setFile(selectedFile);
       setParseError(null);
       setParsedData(null);
+      setValidationWarnings([]);
     } else {
       setFile(null);
       setParseError("Please select a valid CSV file.");
@@ -51,12 +55,33 @@ const CSVUpload = () => {
       reader.onload = async (event) => {
         try {
           const csvData = event.target?.result as string;
+          
+          // Validate CSV headers first
+          const headerValidation = validateCSVHeaders(csvData);
+          
+          if (!headerValidation.isValid) {
+            setParseError(`Missing required columns: ${headerValidation.missingHeaders.join(", ")}`);
+            toast.error("CSV format is invalid. Missing required columns.");
+            setIsUploading(false);
+            return;
+          }
+          
           const data = parseCSVData(csvData);
           
           if (data.length === 0) {
             setParseError("No valid data found in the CSV file.");
             toast.error("No valid data found in the CSV file.");
           } else {
+            // Check for warnings
+            const warnings = [];
+            if (data.some(row => row.amountSpent === 0)) {
+              warnings.push("Some rows have 0 amount spent.");
+            }
+            if (data.some(row => row.impressions < 100)) {
+              warnings.push("Some campaigns have very low impressions (<100).");
+            }
+            
+            setValidationWarnings(warnings);
             setParsedData(data);
             setDialogOpen(true);
           }
@@ -91,10 +116,11 @@ const CSVUpload = () => {
     setIsUploading(true);
     
     try {
-      await saveAdData(parsedData, currentUser.uid, overwrite);
+      await saveAdData(parsedData, currentUser.uid, overwrite, file?.name || "upload.csv");
       resetForm();
       setDialogOpen(false);
       toast.success("Data uploaded successfully!");
+      navigate("/");
     } catch (error) {
       console.error("Firebase upload error:", error);
       toast.error("Failed to upload data to the database.");
@@ -125,9 +151,15 @@ const CSVUpload = () => {
     setFile(null);
     setParseError(null);
     setParsedData(null);
+    setValidationWarnings([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  // Handle redirection to advanced upload page
+  const goToAdvancedUpload = () => {
+    navigate("/upload");
   };
 
   return (
@@ -140,6 +172,13 @@ const CSVUpload = () => {
           </CardTitle>
           <CardDescription>
             Upload your Meta Ads CSV data for analysis and tracking.
+            <Button 
+              variant="link" 
+              onClick={goToAdvancedUpload} 
+              className="text-adpulse-green px-0 hover:no-underline"
+            >
+              Use advanced upload features
+            </Button>
           </CardDescription>
         </CardHeader>
         
@@ -257,6 +296,20 @@ const CSVUpload = () => {
                   <div className="text-xs font-medium text-muted-foreground">
                     {parsedData.length} rows were parsed successfully.
                   </div>
+                  
+                  {validationWarnings.length > 0 && (
+                    <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      <AlertTitle>Warnings</AlertTitle>
+                      <AlertDescription>
+                        <ul className="list-disc pl-5 text-[10px] space-y-1 mt-1">
+                          {validationWarnings.map((warning, index) => (
+                            <li key={index}>{warning}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
                   <div className="border rounded-md overflow-hidden">
                     <table className="w-full text-xs">

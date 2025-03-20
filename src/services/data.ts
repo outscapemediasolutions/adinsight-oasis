@@ -10,7 +10,8 @@ import {
   deleteDoc, 
   Timestamp,
   orderBy,
-  getDoc 
+  getDoc,
+  serverTimestamp
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { toast } from "sonner";
@@ -53,6 +54,20 @@ export interface AdData {
   userId: string;
 }
 
+// Upload Record interface
+export interface UploadRecord {
+  id: string;
+  userId: string;
+  fileName: string;
+  uploadedAt: number; // timestamp
+  recordCount: number;
+  status: 'completed' | 'failed' | 'processing';
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+}
+
 // CSV Column headers - must match this exact order
 export const csvHeaders = [
   "Date",
@@ -90,17 +105,51 @@ export const csvHeaders = [
   "Reporting ends"
 ];
 
-// Parse CSV data and return structured data
-export const parseCSVData = (csvData: string): AdData[] => {
-  const lines = csvData.split('\\n');
+// Validate CSV headers
+export const validateCSVHeaders = (csvData: string) => {
+  const lines = csvData.split('\n');
   
-  // Check if the CSV has headers
+  // Get headers from the first line
   const headers = lines[0].split(',').map(header => header.trim());
   
-  // Validate headers
-  const headerValid = validateHeaders(headers);
-  if (!headerValid) {
-    throw new Error("CSV headers do not match the expected format. Please download and use the provided template.");
+  // Find missing headers
+  const missingHeaders = csvHeaders.filter(required => 
+    !headers.some(header => header.toLowerCase() === required.toLowerCase())
+  );
+  
+  // Find unknown headers
+  const unknownHeaders = headers.filter(header => 
+    !csvHeaders.some(required => required.toLowerCase() === header.toLowerCase())
+  );
+  
+  return {
+    isValid: missingHeaders.length === 0,
+    missingHeaders,
+    unknownHeaders,
+  };
+};
+
+// Parse CSV data and return structured data
+export const parseCSVData = (csvData: string, columnMapping: Record<string, string> = {}): AdData[] => {
+  const lines = csvData.split('\n');
+  
+  // Check if the CSV has headers
+  const originalHeaders = lines[0].split(',').map(header => header.trim());
+  
+  // Create a mapping of indexes for column mapping
+  const headerIndexMap: Record<string, number> = {};
+  
+  // First, map the original headers to their indices
+  originalHeaders.forEach((header, index) => {
+    headerIndexMap[header] = index;
+  });
+  
+  // Then, apply any custom column mappings
+  for (const [originalCol, mappedCol] of Object.entries(columnMapping)) {
+    if (headerIndexMap[originalCol] !== undefined) {
+      // We're remapping this column to a standard one
+      headerIndexMap[mappedCol] = headerIndexMap[originalCol];
+    }
   }
   
   // Parse data rows
@@ -110,69 +159,77 @@ export const parseCSVData = (csvData: string): AdData[] => {
     if (!lines[i].trim()) continue; // Skip empty lines
     
     const values = lines[i].split(',').map(value => value.trim());
-    if (values.length !== headers.length) {
-      throw new Error(`Row ${i} has an incorrect number of columns.`);
+    if (values.length !== originalHeaders.length) {
+      console.warn(`Row ${i} has an incorrect number of columns (${values.length} vs expected ${originalHeaders.length}).`);
+      continue; // Skip invalid rows
     }
     
-    const adData: AdData = {
-      date: values[0],
-      campaignName: values[1],
-      adSetName: values[2],
-      deliveryStatus: values[3],
-      deliveryLevel: values[4],
-      reach: parseFloat(values[5]) || 0,
-      impressions: parseFloat(values[6]) || 0,
-      frequency: parseFloat(values[7]) || 0,
-      attributionSetting: values[8],
-      resultType: values[9],
-      results: parseFloat(values[10]) || 0,
-      amountSpent: parseFloat(values[11]) || 0,
-      costPerResult: parseFloat(values[12]) || 0,
-      purchaseROAS: parseFloat(values[13]) || 0,
-      purchasesConversionValue: parseFloat(values[14]) || 0,
-      starts: parseFloat(values[15]) || 0,
-      ends: parseFloat(values[16]) || 0,
-      linkClicks: parseFloat(values[17]) || 0,
-      cpc: parseFloat(values[18]) || 0,
-      cpm: parseFloat(values[19]) || 0,
-      ctr: parseFloat(values[20]) || 0,
-      cpcAll: parseFloat(values[21]) || 0,
-      clicksAll: parseFloat(values[22]) || 0,
-      addsToCart: parseFloat(values[23]) || 0,
-      checkoutsInitiated: parseFloat(values[24]) || 0,
-      costPerAddToCart: parseFloat(values[25]) || 0,
-      videoPlaysAt50: parseFloat(values[26]) || 0,
-      videoPlaysAt75: parseFloat(values[27]) || 0,
-      videoAveragePlayTime: parseFloat(values[28]) || 0,
-      instagramProfileVisits: parseFloat(values[29]) || 0,
-      pageEngagement: parseFloat(values[30]) || 0,
-      reportingStarts: values[31],
-      reportingEnds: values[32],
-      userId: "", // Will be set when saving to Firestore
-    };
-    
-    // Validate data
-    if (!validateDataRow(adData)) {
-      throw new Error(`Row ${i} contains invalid data. Please check for negative values or invalid formats.`);
+    try {
+      // Use the index mapping to get values in the correct order
+      const adData: AdData = {
+        date: getValueByHeader("Date", values, headerIndexMap),
+        campaignName: getValueByHeader("Campaign name", values, headerIndexMap),
+        adSetName: getValueByHeader("Ad set name", values, headerIndexMap),
+        deliveryStatus: getValueByHeader("Delivery status", values, headerIndexMap),
+        deliveryLevel: getValueByHeader("Delivery level", values, headerIndexMap),
+        reach: parseFloat(getValueByHeader("Reach", values, headerIndexMap)) || 0,
+        impressions: parseFloat(getValueByHeader("Impressions", values, headerIndexMap)) || 0,
+        frequency: parseFloat(getValueByHeader("Frequency", values, headerIndexMap)) || 0,
+        attributionSetting: getValueByHeader("Attribution setting", values, headerIndexMap),
+        resultType: getValueByHeader("Result Type", values, headerIndexMap),
+        results: parseFloat(getValueByHeader("Results", values, headerIndexMap)) || 0,
+        amountSpent: parseFloat(getValueByHeader("Amount spent (INR)", values, headerIndexMap)) || 0,
+        costPerResult: parseFloat(getValueByHeader("Cost per result", values, headerIndexMap)) || 0,
+        purchaseROAS: parseFloat(getValueByHeader("Purchase ROAS (return on ad spend)", values, headerIndexMap)) || 0,
+        purchasesConversionValue: parseFloat(getValueByHeader("Purchases conversion value", values, headerIndexMap)) || 0,
+        starts: parseFloat(getValueByHeader("Starts", values, headerIndexMap)) || 0,
+        ends: parseFloat(getValueByHeader("Ends", values, headerIndexMap)) || 0,
+        linkClicks: parseFloat(getValueByHeader("Link clicks", values, headerIndexMap)) || 0,
+        cpc: parseFloat(getValueByHeader("CPC (cost per link click)", values, headerIndexMap)) || 0,
+        cpm: parseFloat(getValueByHeader("CPM (cost per 1,000 impressions)", values, headerIndexMap)) || 0,
+        ctr: parseFloat(getValueByHeader("CTR (all)", values, headerIndexMap)) || 0,
+        cpcAll: parseFloat(getValueByHeader("CPC (all)", values, headerIndexMap)) || 0,
+        clicksAll: parseFloat(getValueByHeader("Clicks (all)", values, headerIndexMap)) || 0,
+        addsToCart: parseFloat(getValueByHeader("Adds to cart", values, headerIndexMap)) || 0,
+        checkoutsInitiated: parseFloat(getValueByHeader("Checkouts initiated", values, headerIndexMap)) || 0,
+        costPerAddToCart: parseFloat(getValueByHeader("Cost per add to cart", values, headerIndexMap)) || 0,
+        videoPlaysAt50: parseFloat(getValueByHeader("Video plays at 50%", values, headerIndexMap)) || 0,
+        videoPlaysAt75: parseFloat(getValueByHeader("Video plays at 75%", values, headerIndexMap)) || 0,
+        videoAveragePlayTime: parseFloat(getValueByHeader("Video average play time", values, headerIndexMap)) || 0,
+        instagramProfileVisits: parseFloat(getValueByHeader("Instagram profile visits", values, headerIndexMap)) || 0,
+        pageEngagement: parseFloat(getValueByHeader("Page engagement", values, headerIndexMap)) || 0,
+        reportingStarts: getValueByHeader("Reporting starts", values, headerIndexMap),
+        reportingEnds: getValueByHeader("Reporting ends", values, headerIndexMap),
+        userId: "", // Will be set when saving to Firestore
+      };
+      
+      // Validate data
+      if (!validateDataRow(adData)) {
+        console.warn(`Row ${i} contains invalid data. Skipping.`);
+        continue;
+      }
+      
+      result.push(adData);
+    } catch (error) {
+      console.error(`Error parsing row ${i}:`, error);
+      throw new Error(`Row ${i} contains invalid data: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    result.push(adData);
+  }
+  
+  if (result.length === 0) {
+    throw new Error("No valid data rows found in the CSV file.");
   }
   
   return result;
 };
 
-// Validate CSV headers
-const validateHeaders = (headers: string[]): boolean => {
-  if (headers.length !== csvHeaders.length) return false;
-  
-  for (let i = 0; i < csvHeaders.length; i++) {
-    if (headers[i].toLowerCase() !== csvHeaders[i].toLowerCase()) {
-      return false;
-    }
+// Helper function to get value by header name using the mapping
+const getValueByHeader = (headerName: string, values: string[], headerIndexMap: Record<string, number>): string => {
+  const index = headerIndexMap[headerName];
+  if (index === undefined) {
+    throw new Error(`Required column '${headerName}' is missing`);
   }
-  
-  return true;
+  return values[index] || "";
 };
 
 // Validate individual data row
@@ -198,9 +255,29 @@ const validateDataRow = (data: AdData): boolean => {
   return true;
 };
 
-// Save ad data to Firestore
-export const saveAdData = async (data: AdData[], userId: string, overwrite: boolean = false) => {
+// Save ad data to Firestore and record the upload
+export const saveAdData = async (
+  data: AdData[], 
+  userId: string, 
+  overwrite: boolean = false,
+  fileName: string = "data-upload.csv"
+) => {
   try {
+    // Start by creating an upload record
+    const uploadRecord = {
+      userId,
+      fileName,
+      uploadedAt: Date.now(),
+      recordCount: data.length,
+      status: 'processing' as const,
+      dateRange: {
+        start: data.reduce((min, item) => !min || item.date < min ? item.date : min, ""),
+        end: data.reduce((max, item) => !max || item.date > max ? item.date : max, ""),
+      }
+    };
+    
+    const uploadRef = await addDoc(collection(db, "uploads"), uploadRecord);
+    
     // Check for existing data with same date, campaign, and ad set
     let savedCount = 0;
     let skippedCount = 0;
@@ -236,6 +313,12 @@ export const saveAdData = async (data: AdData[], userId: string, overwrite: bool
       }
     }
     
+    // Update the upload record with final status
+    await updateDoc(doc(db, "uploads", uploadRef.id), {
+      status: 'completed',
+      recordCount: savedCount
+    });
+    
     // Show success message
     if (savedCount > 0 && skippedCount === 0) {
       toast.success(`Successfully saved ${savedCount} data entries.`);
@@ -245,12 +328,169 @@ export const saveAdData = async (data: AdData[], userId: string, overwrite: bool
       toast.warning(`Skipped all ${skippedCount} entries as they already exist. Use 'Overwrite' option to update existing data.`);
     }
     
-    return { savedCount, skippedCount };
+    return { savedCount, skippedCount, uploadId: uploadRef.id };
   } catch (error) {
     console.error("Error saving ad data:", error);
     toast.error("Failed to save data. Please try again.");
     throw error;
   }
+};
+
+// Get user's upload history
+export const getUserUploads = async (userId: string): Promise<UploadRecord[]> => {
+  try {
+    const q = query(
+      collection(db, "uploads"),
+      where("userId", "==", userId),
+      orderBy("uploadedAt", "desc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    const uploads: UploadRecord[] = [];
+    querySnapshot.forEach((doc) => {
+      uploads.push({
+        id: doc.id,
+        ...doc.data()
+      } as UploadRecord);
+    });
+    
+    return uploads;
+  } catch (error) {
+    console.error("Error getting upload history:", error);
+    throw error;
+  }
+};
+
+// Download historical data based on upload ID
+export const downloadHistoricalData = async (
+  userId: string, 
+  uploadId: string, 
+  format: "csv" | "json" = "csv"
+) => {
+  try {
+    // First get the upload record
+    const uploadDoc = await getDoc(doc(db, "uploads", uploadId));
+    
+    if (!uploadDoc.exists()) {
+      throw new Error("Upload record not found");
+    }
+    
+    const uploadData = uploadDoc.data() as UploadRecord;
+    
+    // Verify the user has permission
+    if (uploadData.userId !== userId) {
+      throw new Error("You don't have permission to access this data");
+    }
+    
+    // Get the actual data
+    let q = query(
+      collection(db, "adData"),
+      where("userId", "==", userId)
+    );
+    
+    // Add date range filter if available
+    if (uploadData.dateRange?.start && uploadData.dateRange?.end) {
+      q = query(
+        q, 
+        where("date", ">=", uploadData.dateRange.start),
+        where("date", "<=", uploadData.dateRange.end)
+      );
+    }
+    
+    const querySnapshot = await getDocs(q);
+    
+    const data: AdData[] = [];
+    querySnapshot.forEach((doc) => {
+      data.push(doc.data() as AdData);
+    });
+    
+    // Format and download the data
+    let downloadContent: string;
+    let fileName: string;
+    let mimeType: string;
+    
+    if (format === "csv") {
+      downloadContent = convertToCSV(data);
+      fileName = `adpulse_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      mimeType = "text/csv";
+    } else {
+      downloadContent = JSON.stringify(data, null, 2);
+      fileName = `adpulse_export_${new Date().toISOString().slice(0, 10)}.json`;
+      mimeType = "application/json";
+    }
+    
+    // Create and trigger download
+    const blob = new Blob([downloadContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    return { success: true, recordCount: data.length };
+  } catch (error) {
+    console.error("Error downloading historical data:", error);
+    throw error;
+  }
+};
+
+// Convert data to CSV
+const convertToCSV = (data: AdData[]): string => {
+  // Create CSV header
+  const csvRows = [csvHeaders.join(',')];
+  
+  // Add data rows
+  for (const item of data) {
+    const row = [
+      item.date,
+      `"${item.campaignName.replace(/"/g, '""')}"`, // Escape quotes
+      `"${item.adSetName.replace(/"/g, '""')}"`,
+      item.deliveryStatus,
+      item.deliveryLevel,
+      item.reach,
+      item.impressions,
+      item.frequency,
+      item.attributionSetting,
+      item.resultType,
+      item.results,
+      item.amountSpent,
+      item.costPerResult,
+      item.purchaseROAS,
+      item.purchasesConversionValue,
+      item.starts,
+      item.ends,
+      item.linkClicks,
+      item.cpc,
+      item.cpm,
+      item.ctr,
+      item.cpcAll,
+      item.clicksAll,
+      item.addsToCart,
+      item.checkoutsInitiated,
+      item.costPerAddToCart,
+      item.videoPlaysAt50,
+      item.videoPlaysAt75,
+      item.videoAveragePlayTime,
+      item.instagramProfileVisits,
+      item.pageEngagement,
+      item.reportingStarts,
+      item.reportingEnds
+    ];
+    
+    csvRows.push(row.join(','));
+  }
+  
+  return csvRows.join('\n');
+};
+
+// Generate CSV template
+export const generateCSVTemplate = (): string => {
+  return csvHeaders.join(',');
 };
 
 // Get ad data from Firestore
