@@ -5,13 +5,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBFg2XRovz7SbEmKor-3PHC2jR9OiUbt7M",
-  authDomain: "adpulse-analytics-ff853.firebaseapp.com",
-  projectId: "adpulse-analytics-ff853",
-  storageBucket: "adpulse-analytics-ff853.firebasestorage.app",
-  messagingSenderId: "553102131576",
-  appId: "1:553102131576:web:dfc4bd9345dc06b149088d",
-  measurementId: "G-RR4JN9TM8Z"
+  apiKey: "AIzaSyA8VM7lI4odx1F7xI8kequvxkaMKlHVfME",
+  authDomain: "adpulse-by-vimal-bachani.firebaseapp.com",
+  projectId: "adpulse-by-vimal-bachani",
+  storageBucket: "adpulse-by-vimal-bachani.firebasestorage.app",
+  messagingSenderId: "808573211217",
+  appId: "1:808573211217:web:e0c5ec3a30f1ce6f9c1e70",
+  measurementId: "G-QGPCSNSREZ"
 };
 
 // Initialize Firebase
