@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -196,12 +197,11 @@ const UploadPage = () => {
           const csvText = e.target?.result as string;
           setCsvData(csvText);
           
-          // Extract available columns from the file for mapping
+          // Extract available columns from CSV
           const lines = csvText.split('\n');
           if (lines.length > 0) {
-            const fileHeaders = lines[0].split(',').map(header => header.trim());
-            setAvailableColumns(fileHeaders);
-            console.log("Available columns:", fileHeaders);
+            const headers = lines[0].split(',').map(h => h.trim());
+            setAvailableColumns(headers);
           }
           
           // Validate CSV headers first
@@ -215,7 +215,6 @@ const UploadPage = () => {
             }))];
             
             if (mismatches.length > 0) {
-              console.log("Header mismatches found:", mismatches);
               setHeaderMismatch(mismatches);
               setColumnMappingOpen(true);
               setIsValidating(false);
@@ -279,7 +278,6 @@ const UploadPage = () => {
       }
     });
     
-    console.log("Applying column mapping:", newMapping);
     setColumnMapping(newMapping);
     setColumnMappingOpen(false);
     
@@ -622,14 +620,11 @@ const UploadPage = () => {
                             <td className="px-4 py-3 text-sm">{header}</td>
                             <td className="px-4 py-3 text-sm text-white/70">
                               {header.toLowerCase().includes('date') ? 'Date (YYYY-MM-DD)' : 
-                               header.toLowerCase().includes('name') ? 'Text' :
-                               header.toLowerCase().includes('status') || header.toLowerCase().includes('level') ? 'Text' :
-                               header.toLowerCase().includes('roas') || header.toLowerCase().includes('cost') || 
-                               header.toLowerCase().includes('cpc') || header.toLowerCase().includes('cpm') || 
-                               header.toLowerCase().includes('ctr') ? 'Number' : 'Number'}
+                               header.toLowerCase().includes('name') || header.toLowerCase().includes('status') || header.toLowerCase().includes('level') || header.toLowerCase().includes('setting') || header.toLowerCase().includes('type') ? 'Text' : 
+                               'Number'}
                             </td>
                             <td className="px-4 py-3 text-sm text-white/70">
-                              {header} data from Meta Ads
+                              {header}
                             </td>
                           </tr>
                         ))}
@@ -759,7 +754,7 @@ const UploadPage = () => {
                   <div>
                     <Label className="mb-1 block">Map From</Label>
                     <Select
-                      value={mismatch.original || "none"} 
+                      value={mismatch.original || "none"}
                       onValueChange={(value) => {
                         const updated = [...headerMismatch];
                         updated[index].original = value === "none" ? "" : value;
@@ -833,23 +828,63 @@ const UploadPage = () => {
             
             <div>
               <Label className="mb-2 block">Download Format</Label>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <Button
-                    variant={downloadFormat === "csv" ? "default" : "outline"}
-                    className={`w-full ${downloadFormat === "csv" ? "bg-adpulse-green text-[#021627]" : "bg-transparent border-white/20"}`}
-                    onClick={() => setDownloadFormat("csv")}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    CSV
-                  </Button>
+              <RadioGroup 
+                value={downloadFormat} 
+                onValueChange={(value) => setDownloadFormat(value as "csv" | "json")}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="csv" id="csv" />
+                  <Label htmlFor="csv">CSV</Label>
                 </div>
-                <div className="flex-1">
-                  <Button
-                    variant={downloadFormat === "json" ? "default" : "outline"}
-                    className={`w-full ${downloadFormat === "json" ? "bg-adpulse-green text-[#021627]" : "bg-transparent border-white/20"}`}
-                    onClick={() => setDownloadFormat("json")}
-                  >
-                    <File className="h-4 w-4 mr-2" />
-                    JSON
-                  </
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="json" id="json" />
+                  <Label htmlFor="json">JSON</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+          
+          {downloadInProgress && (
+            <div className="space-y-2">
+              <Progress value={downloadProgress} className="h-2" />
+              <p className="text-xs text-white/60 text-center">
+                {downloadProgress === 100 ? "Download complete!" : "Preparing download..."}
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDownloadDialogOpen(false)}
+              disabled={downloadInProgress}
+              className="mr-2"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleHistoricalDownload}
+              disabled={downloadInProgress}
+              className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90"
+            >
+              {downloadInProgress ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-[#021627] border-r-transparent rounded-full animate-spin mr-2"></div>
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default UploadPage;
