@@ -67,7 +67,7 @@ export interface UploadRecord {
   };
 }
 
-// CSV Column headers - updating to match exactly what's in the CSV file
+// IMPORTANT: Match EXACTLY the column names from the CSV file
 export const csvHeaders = [
   "Date",
   "Campaign name",
@@ -143,13 +143,18 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
     headerIndexMap[header] = index;
   });
   
-  // Special case for CPM - check if the file has the longer version of the header
-  if (headerIndexMap["CPM (cost per 1,000 impressions)"] !== undefined && headerIndexMap["CPM"] === undefined) {
-    // Map the longer version to the shorter one
-    headerIndexMap["CPM"] = headerIndexMap["CPM (cost per 1,000 impressions)"];
-  }
+  // Special case for column headers with long names
+  // Map longer version to shorter ones to be more flexible with input
+  const headerMappings: Record<string, string> = {
+    "CPM (cost per 1,000 impressions)": "CPM (cost per 1,000 impressions)",
+    "CPC (cost per link click)": "CPC (cost per link click)",
+    "CTR (all)": "CTR (all)",
+    "CPC (all)": "CPC (all)",
+    "Clicks (all)": "Clicks (all)",
+    "Purchase ROAS (return on ad spend)": "Purchase ROAS (return on ad spend)"
+  };
   
-  // Then, apply any custom column mappings
+  // Apply any custom column mappings
   for (const [originalCol, mappedCol] of Object.entries(columnMapping)) {
     if (headerIndexMap[originalCol] !== undefined) {
       // We're remapping this column to a standard one
@@ -513,6 +518,7 @@ export const generateCSVTemplate = (): string => {
 // Get ad data from Firestore
 export const getAdData = async (userId: string, startDate?: string, endDate?: string, campaignName?: string, adSetName?: string) => {
   try {
+    console.log(`Getting ad data for user: ${userId}`);
     let q = query(
       collection(db, "adData"),
       where("userId", "==", userId)
@@ -532,15 +538,17 @@ export const getAdData = async (userId: string, startDate?: string, endDate?: st
       q = query(q, where("adSetName", "==", adSetName));
     }
     
-    // Order by date
-    q = query(q, orderBy("date", "asc"));
-    
+    console.log("Executing query...");
     const querySnapshot = await getDocs(q);
+    console.log(`Query returned ${querySnapshot.size} documents`);
     
     const data: AdData[] = [];
     querySnapshot.forEach((doc) => {
       data.push(doc.data() as AdData);
     });
+    
+    // Debug log to see what data was retrieved
+    console.log(`Processed ${data.length} records with data:`, data.length > 0 ? data[0] : "No data");
     
     return data;
   } catch (error) {
@@ -654,6 +662,8 @@ export const deleteAdData = async (userId: string, date: string, campaignName: s
 
 // Calculate performance metrics
 export const calculateMetrics = (data: AdData[]) => {
+  console.log(`Calculating metrics for ${data.length} records`);
+  
   // Initialize metrics
   let totalSpend = 0;
   let totalSales = 0;
@@ -686,6 +696,8 @@ export const calculateMetrics = (data: AdData[]) => {
   const visitorsPerOrder = totalOrders > 0 ? totalVisitors / totalOrders : 0;
   const costPerResult = totalOrders > 0 ? totalSpend / totalOrders : 0;
   
+  console.log("Calculated metrics:", { totalSpend, totalSales, roas, cpc, cpm, ctr });
+  
   return {
     totalSpend,
     totalSales,
@@ -708,6 +720,8 @@ export const calculateMetrics = (data: AdData[]) => {
 
 // Get campaign performance
 export const getCampaignPerformance = (data: AdData[]) => {
+  console.log(`Getting campaign performance for ${data.length} records`);
+  
   // Group data by campaign
   const campaigns = new Map<string, AdData[]>();
   
@@ -725,6 +739,8 @@ export const getCampaignPerformance = (data: AdData[]) => {
     const metrics = calculateMetrics(campaignData);
     campaignMetrics.push({ campaignName, metrics });
   });
+  
+  console.log(`Processed ${campaignMetrics.length} campaigns`);
   
   return campaignMetrics;
 };
@@ -760,6 +776,8 @@ export const getAdSetPerformance = (data: AdData[]) => {
 
 // Get aggregated data by date
 export const getDataByDate = (data: AdData[]) => {
+  console.log(`Getting data by date for ${data.length} records`);
+  
   // Group data by date
   const dates = new Map<string, AdData[]>();
   
@@ -782,6 +800,8 @@ export const getDataByDate = (data: AdData[]) => {
   dateMetrics.sort((a, b) => {
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
+  
+  console.log(`Processed ${dateMetrics.length} unique dates`);
   
   return dateMetrics;
 };

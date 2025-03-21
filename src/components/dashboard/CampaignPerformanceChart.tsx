@@ -23,7 +23,10 @@ interface CampaignPerformanceChartProps {
 }
 
 const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerformanceChartProps) => {
-  const placeholderData: CampaignData[] = data || [
+  console.log("CampaignPerformanceChart received data:", data);
+  
+  // Use the data passed in or fall back to placeholder data if none provided
+  const chartData: CampaignData[] = data || [
     { name: "Summer Sale", spend: 12000, sales: 36000, roas: 3.0 },
     { name: "New Collection", spend: 8500, sales: 21250, roas: 2.5 },
     { name: "Holiday Special", spend: 15000, sales: 37500, roas: 2.5 },
@@ -31,9 +34,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     { name: "Clearance", spend: 6500, sales: 9750, roas: 1.5 }
   ];
 
-  const sortedByRoas = [...placeholderData].sort((a, b) => b.roas - a.roas);
-  const sortedBySpend = [...placeholderData].sort((a, b) => b.spend - a.spend);
-  const sortedBySales = [...placeholderData].sort((a, b) => b.sales - a.sales);
+  // Only sort if we have real data (not placeholder data)
+  const sortedByRoas = data 
+    ? [...chartData].sort((a, b) => b.roas - a.roas)
+    : chartData;
+    
+  const sortedBySpend = data
+    ? [...chartData].sort((a, b) => b.spend - a.spend)
+    : chartData;
+    
+  const sortedBySales = data
+    ? [...chartData].sort((a, b) => b.sales - a.sales)
+    : chartData;
 
   const colors = ["#6fe394", "#00bcd4", "#ffcc00", "#ff9800", "#ff5252"];
 
@@ -99,7 +111,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                   <XAxis dataKey="name" />
                   <YAxis 
                     tickFormatter={(value) => `${value}x`} 
-                    domain={[0, Math.max(...sortedByRoas.map(item => item.roas)) * 1.2]} 
+                    domain={[0, Math.max(...sortedByRoas.map(item => item.roas || 0)) * 1.2 || 5]} 
                   />
                   <ChartTooltip
                     content={<ChartTooltipContent />}
@@ -121,7 +133,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                   <XAxis dataKey="name" />
                   <YAxis 
                     tickFormatter={(value) => `₹${value / 1000}k`} 
-                    domain={[0, Math.max(...sortedBySpend.map(item => item.spend)) * 1.2]} 
+                    domain={[0, Math.max(...sortedBySpend.map(item => item.spend || 0)) * 1.2 || 20000]} 
                   />
                   <ChartTooltip
                     content={<ChartTooltipContent />}
@@ -143,7 +155,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                   <XAxis dataKey="name" />
                   <YAxis 
                     tickFormatter={(value) => `₹${value / 1000}k`} 
-                    domain={[0, Math.max(...sortedBySales.map(item => item.sales)) * 1.2]} 
+                    domain={[0, Math.max(...sortedBySales.map(item => item.sales || 0)) * 1.2 || 40000]} 
                   />
                   <ChartTooltip
                     content={<ChartTooltipContent />}

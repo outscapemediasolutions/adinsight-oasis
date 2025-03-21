@@ -7,9 +7,10 @@ import PerformanceTable from "./PerformanceTable";
 import CampaignPerformanceChart from "./CampaignPerformanceChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Upload, ListFilter } from "lucide-react";
+import { Calendar, Upload, ListFilter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -17,6 +18,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<ReturnType<typeof calculateMetrics> | null>(null);
   const [campaignData, setCampaignData] = useState<any[]>([]);
+  const navigate = useNavigate();
   
   useEffect(() => {
     const fetchData = async () => {
@@ -24,13 +26,17 @@ const Dashboard = () => {
       
       try {
         setIsLoading(true);
+        console.log("Dashboard: Fetching data for user", currentUser.uid);
         const data = await getAdData(currentUser.uid);
+        console.log("Dashboard: Fetched data count:", data.length);
         setAdData(data);
         
         if (data.length > 0) {
+          console.log("Dashboard: Calculating metrics");
           const calculatedMetrics = calculateMetrics(data);
           setMetrics(calculatedMetrics);
           
+          console.log("Dashboard: Getting campaign performance");
           const campaignPerformance = getCampaignPerformance(data);
           const formattedCampaignData = campaignPerformance.map(campaign => ({
             name: campaign.campaignName,
@@ -39,7 +45,10 @@ const Dashboard = () => {
             roas: campaign.metrics.roas
           }));
           
+          console.log("Dashboard: Setting campaign data", formattedCampaignData.length);
           setCampaignData(formattedCampaignData);
+        } else {
+          console.log("Dashboard: No data available");
         }
       } catch (error) {
         console.error("Error fetching ad data:", error);
@@ -51,6 +60,44 @@ const Dashboard = () => {
     
     fetchData();
   }, [currentUser]);
+  
+  const handleRefresh = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setIsLoading(true);
+      toast.info("Refreshing data...");
+      console.log("Dashboard: Refreshing data for user", currentUser.uid);
+      const data = await getAdData(currentUser.uid);
+      console.log("Dashboard: Refreshed data count:", data.length);
+      setAdData(data);
+      
+      if (data.length > 0) {
+        const calculatedMetrics = calculateMetrics(data);
+        setMetrics(calculatedMetrics);
+        
+        const campaignPerformance = getCampaignPerformance(data);
+        const formattedCampaignData = campaignPerformance.map(campaign => ({
+          name: campaign.campaignName,
+          spend: campaign.metrics.totalSpend,
+          sales: campaign.metrics.totalSales,
+          roas: campaign.metrics.roas
+        }));
+        
+        setCampaignData(formattedCampaignData);
+        toast.success("Data refreshed successfully");
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast.error("Failed to refresh data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleUploadClick = () => {
+    navigate("/upload");
+  };
   
   return (
     <div className="space-y-6">
@@ -65,7 +112,22 @@ const Dashboard = () => {
             <ListFilter className="mr-2 h-4 w-4" />
             Filter
           </Button>
-          <Button variant="default" size="sm" className="h-9">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-9"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="h-9"
+            onClick={handleUploadClick}
+          >
             <Upload className="mr-2 h-4 w-4" />
             Upload Data
           </Button>
@@ -142,6 +204,17 @@ const Dashboard = () => {
           <PerformanceTable data={adData} isLoading={isLoading} />
         </CardContent>
       </Card>
+      
+      {adData.length === 0 && !isLoading && (
+        <Card className="p-8 text-center">
+          <h3 className="text-lg font-medium mb-2">No data available</h3>
+          <p className="text-muted-foreground mb-4">Upload your ad data to see insights and analytics</p>
+          <Button onClick={handleUploadClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Data
+          </Button>
+        </Card>
+      )}
     </div>
   );
 };
