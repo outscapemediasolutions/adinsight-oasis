@@ -67,7 +67,7 @@ export interface UploadRecord {
   };
 }
 
-// CSV Column headers - must match this exact order
+// CSV Column headers - updating to match exactly what's in the CSV file
 export const csvHeaders = [
   "Date",
   "Campaign name",
@@ -88,7 +88,7 @@ export const csvHeaders = [
   "Ends",
   "Link clicks",
   "CPC (cost per link click)",
-  "CPM", // Changed from "CPM (cost per 1,000 impressions)" to simply "CPM"
+  "CPM (cost per 1,000 impressions)",
   "CTR (all)",
   "CPC (all)",
   "Clicks (all)",
@@ -164,6 +164,7 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
     if (!lines[i].trim()) continue; // Skip empty lines
     
     const values = lines[i].split(',').map(value => value.trim());
+    
     if (values.length !== originalHeaders.length) {
       console.warn(`Row ${i} has an incorrect number of columns (${values.length} vs expected ${originalHeaders.length}).`);
       continue; // Skip invalid rows
@@ -191,7 +192,7 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
         ends: parseFloat(getValueByHeader("Ends", values, headerIndexMap)) || 0,
         linkClicks: parseFloat(getValueByHeader("Link clicks", values, headerIndexMap)) || 0,
         cpc: parseFloat(getValueByHeader("CPC (cost per link click)", values, headerIndexMap)) || 0,
-        cpm: parseFloat(getValueByHeader("CPM", values, headerIndexMap)) || 0, // Updated to use the simplified CPM header
+        cpm: parseFloat(getValueByHeader("CPM (cost per 1,000 impressions)", values, headerIndexMap)) || 0,
         ctr: parseFloat(getValueByHeader("CTR (all)", values, headerIndexMap)) || 0,
         cpcAll: parseFloat(getValueByHeader("CPC (all)", values, headerIndexMap)) || 0,
         clicksAll: parseFloat(getValueByHeader("Clicks (all)", values, headerIndexMap)) || 0,
@@ -239,22 +240,27 @@ const getValueByHeader = (headerName: string, values: string[], headerIndexMap: 
 
 // Validate individual data row
 const validateDataRow = (data: AdData): boolean => {
-  // Check for negative values in numeric fields
-  if (
-    data.reach < 0 ||
-    data.impressions < 0 ||
-    data.frequency < 0 ||
-    data.results < 0 ||
-    data.amountSpent < 0 ||
-    data.linkClicks < 0
-  ) {
+  // Make validation less strict to handle more data formats
+  // Only check that required string fields are not empty and date format
+  if (!data.date || !data.campaignName || !data.adSetName) {
     return false;
   }
   
-  // Check date format (YYYY-MM-DD)
+  // Check date format (YYYY-MM-DD) or any other common date format
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(data.date)) {
-    return false;
+    // Try to parse as a date and format it
+    try {
+      const parsedDate = new Date(data.date);
+      if (!isNaN(parsedDate.getTime())) {
+        // It's a valid date, but not in the expected format
+        // Let's accept it anyway
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
   
   return true;

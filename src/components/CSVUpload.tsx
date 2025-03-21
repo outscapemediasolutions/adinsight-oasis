@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData } from "@/services/data";
+import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData, csvHeaders } from "@/services/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { Upload, Download, AlertTriangle, X, Check, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ const CSVUpload = () => {
           const headerValidation = validateCSVHeaders(csvData);
           
           if (!headerValidation.isValid) {
+            console.log("Missing headers:", headerValidation.missingHeaders);
             setParseError(`Missing required columns: ${headerValidation.missingHeaders.join(", ")}`);
             toast.error("CSV format is invalid. Missing required columns.");
             setIsUploading(false);
@@ -171,13 +173,22 @@ const CSVUpload = () => {
     navigate("/upload");
   };
 
+  // Display column format in a more readable way
+  const formatColumnName = (name: string) => {
+    return (
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] inline-block">
+        {name}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card className="glass-card">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center text-xl font-semibold">
             <FileText className="mr-2 h-5 w-5 text-adpulse-green" />
-            Upload Ad Data
+            Upload Meta Ads Data
           </CardTitle>
           <CardDescription>
             Upload your Meta Ads CSV data for analysis and tracking.
@@ -195,7 +206,7 @@ const CSVUpload = () => {
           <Tabs defaultValue="upload" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="upload">Upload CSV</TabsTrigger>
-              <TabsTrigger value="template">Download Template</TabsTrigger>
+              <TabsTrigger value="template">Format Requirements</TabsTrigger>
             </TabsList>
             
             <TabsContent value="upload" className="pt-4">
@@ -243,16 +254,19 @@ const CSVUpload = () => {
             <TabsContent value="template" className="pt-4">
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Download our CSV template to ensure your data is formatted correctly for upload.
-                  The template includes all required columns in the correct order.
+                  Your CSV file must include the following columns in exactly this order:
                 </p>
                 
-                <div className="grid gap-4">
-                  <h4 className="text-sm font-medium">Required Columns:</h4>
-                  <div className="text-xs text-muted-foreground grid gap-1.5">
-                    <p>Date, Campaign name, Ad set name, Delivery status, Delivery level, Reach, Impressions, Frequency,</p>
-                    <p>Attribution setting, Result Type, Results, Amount spent (INR), Cost per result, Purchase ROAS,</p>
-                    <p>Purchases conversion value, Starts, Ends, Link clicks, CPC, CPM, CTR, and more...</p>
+                <div className="bg-card border rounded-md p-4 overflow-auto max-h-[400px]">
+                  <div className="grid grid-cols-1 gap-2">
+                    {csvHeaders.map((header, index) => (
+                      <div 
+                        key={index} 
+                        className="text-xs py-1 px-2 border border-white/10 rounded bg-muted/50"
+                      >
+                        {header}
+                      </div>
+                    ))}
                   </div>
                 </div>
                 
