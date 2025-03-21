@@ -47,6 +47,7 @@ const PerformanceTable = ({ data, isLoading = false }: PerformanceTableProps) =>
           <TableHead>Impressions</TableHead>
           <TableHead>Clicks</TableHead>
           <TableHead>CTR</TableHead>
+          <TableHead>CPM</TableHead>
           <TableHead className="text-right">Amount Spent</TableHead>
         </TableRow>
       </TableHeader>
@@ -59,6 +60,7 @@ const PerformanceTable = ({ data, isLoading = false }: PerformanceTableProps) =>
             <TableCell>{row.impressions.toLocaleString()}</TableCell>
             <TableCell>{row.clicksAll.toLocaleString()}</TableCell>
             <TableCell>{(row.ctr * 100).toFixed(2)}%</TableCell>
+            <TableCell>₹{row.cpm.toFixed(2)}</TableCell>
             <TableCell className="text-right">₹{row.amountSpent.toLocaleString()}</TableCell>
           </TableRow>
         ))}

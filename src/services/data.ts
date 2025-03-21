@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   addDoc, 
@@ -89,7 +88,7 @@ export const csvHeaders = [
   "Ends",
   "Link clicks",
   "CPC (cost per link click)",
-  "CPM (cost per 1,000 impressions)",
+  "CPM", // Changed from "CPM (cost per 1,000 impressions)" to simply "CPM"
   "CTR (all)",
   "CPC (all)",
   "Clicks (all)",
@@ -144,6 +143,12 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
     headerIndexMap[header] = index;
   });
   
+  // Special case for CPM - check if the file has the longer version of the header
+  if (headerIndexMap["CPM (cost per 1,000 impressions)"] !== undefined && headerIndexMap["CPM"] === undefined) {
+    // Map the longer version to the shorter one
+    headerIndexMap["CPM"] = headerIndexMap["CPM (cost per 1,000 impressions)"];
+  }
+  
   // Then, apply any custom column mappings
   for (const [originalCol, mappedCol] of Object.entries(columnMapping)) {
     if (headerIndexMap[originalCol] !== undefined) {
@@ -186,7 +191,7 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
         ends: parseFloat(getValueByHeader("Ends", values, headerIndexMap)) || 0,
         linkClicks: parseFloat(getValueByHeader("Link clicks", values, headerIndexMap)) || 0,
         cpc: parseFloat(getValueByHeader("CPC (cost per link click)", values, headerIndexMap)) || 0,
-        cpm: parseFloat(getValueByHeader("CPM (cost per 1,000 impressions)", values, headerIndexMap)) || 0,
+        cpm: parseFloat(getValueByHeader("CPM", values, headerIndexMap)) || 0, // Updated to use the simplified CPM header
         ctr: parseFloat(getValueByHeader("CTR (all)", values, headerIndexMap)) || 0,
         cpcAll: parseFloat(getValueByHeader("CPC (all)", values, headerIndexMap)) || 0,
         clicksAll: parseFloat(getValueByHeader("Clicks (all)", values, headerIndexMap)) || 0,
