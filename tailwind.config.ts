@@ -19,6 +19,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Poppins', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -60,6 +64,7 @@ export default {
           "blue-dark": "#021627",
           blue: "#074973",
           gray: "#8E9196",
+          red: "#ff5252",
         },
       },
       borderRadius: {

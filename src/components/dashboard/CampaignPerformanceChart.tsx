@@ -7,7 +7,18 @@ import {
   ChartTooltip,
   ChartTooltipContent
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  ResponsiveContainer, 
+  Cell, 
+  AreaChart, 
+  Area, 
+  Tooltip 
+} from "recharts";
 import { ArrowUpDown } from "lucide-react";
 
 interface CampaignData {
@@ -47,7 +58,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     ? [...chartData].sort((a, b) => b.sales - a.sales)
     : chartData;
 
-  const colors = ["#6fe394", "#00bcd4", "#ffcc00", "#ff9800", "#ff5252"];
+  // Updated color palette to match the reference image
+  const colors = {
+    roas: "#ffcc00",
+    spend: "#ff9800",
+    sales: "#6fe394"
+  };
+  
+  const gradientColors = {
+    roas: ["rgba(255, 204, 0, 0.8)", "rgba(255, 204, 0, 0.1)"],
+    spend: ["rgba(255, 152, 0, 0.8)", "rgba(255, 152, 0, 0.1)"],
+    sales: ["rgba(111, 227, 148, 0.8)", "rgba(111, 227, 148, 0.1)"]
+  };
 
   if (isLoading) {
     return (
@@ -69,103 +91,163 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     spend: {
       label: "Ad Spend",
       theme: {
-        light: "#00bcd4",
-        dark: "#00bcd4"
+        light: colors.spend,
+        dark: colors.spend
       }
     },
     sales: {
       label: "Sales Revenue",
       theme: {
-        light: "#6fe394",
-        dark: "#6fe394"
+        light: colors.sales,
+        dark: colors.sales
       }
     },
     roas: {
       label: "ROAS",
       theme: {
-        light: "#ffcc00",
-        dark: "#ffcc00"
+        light: colors.roas,
+        dark: colors.roas
       }
     }
   };
 
   return (
-    <Card>
+    <Card className="bg-[#0B2537] border-white/10">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-white">
           Campaign Performance <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Tabs defaultValue="roas">
-          <TabsList className="mb-4">
+          <TabsList className="bg-[#021627]/50 m-4 w-auto">
             <TabsTrigger value="roas">ROAS</TabsTrigger>
             <TabsTrigger value="spend">Spend</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>
           </TabsList>
-          <TabsContent value="roas" className="h-[300px]">
+          <TabsContent value="roas" className="h-[300px] px-4 pt-0 pb-4">
             <ChartContainer config={chartConfig}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sortedByRoas} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
+                <AreaChart data={sortedByRoas} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="roasGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={gradientColors.roas[0]} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={gradientColors.roas[1]} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#e0f2f1" 
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
+                  />
                   <YAxis 
                     tickFormatter={(value) => `${value}x`} 
                     domain={[0, Math.max(...sortedByRoas.map(item => item.roas || 0)) * 1.2 || 5]} 
+                    stroke="#e0f2f1"
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
                   />
-                  <ChartTooltip
-                    content={<ChartTooltipContent />}
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                    formatter={(value: number) => [`${value.toFixed(2)}x`, "ROAS"]}
+                    labelStyle={{ color: "#e0f2f1" }}
                   />
-                  <Bar dataKey="roas" name="ROAS">
-                    {sortedByRoas.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <Area 
+                    type="monotone" 
+                    dataKey="roas" 
+                    name="ROAS" 
+                    stroke={colors.roas} 
+                    fillOpacity={1}
+                    fill="url(#roasGradient)"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
           </TabsContent>
-          <TabsContent value="spend" className="h-[300px]">
+          <TabsContent value="spend" className="h-[300px] px-4 pt-0 pb-4">
             <ChartContainer config={chartConfig}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sortedBySpend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
+                <AreaChart data={sortedBySpend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={gradientColors.spend[0]} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={gradientColors.spend[1]} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#e0f2f1" 
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
+                  />
                   <YAxis 
                     tickFormatter={(value) => `₹${value / 1000}k`} 
                     domain={[0, Math.max(...sortedBySpend.map(item => item.spend || 0)) * 1.2 || 20000]} 
+                    stroke="#e0f2f1"
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
                   />
-                  <ChartTooltip
-                    content={<ChartTooltipContent />}
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                    formatter={(value: number) => [`₹${value.toFixed(2)}`, "Ad Spend"]}
+                    labelStyle={{ color: "#e0f2f1" }}
                   />
-                  <Bar dataKey="spend" name="Ad Spend">
-                    {sortedBySpend.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <Area 
+                    type="monotone" 
+                    dataKey="spend" 
+                    name="Ad Spend" 
+                    stroke={colors.spend}
+                    fillOpacity={1}
+                    fill="url(#spendGradient)"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
           </TabsContent>
-          <TabsContent value="sales" className="h-[300px]">
+          <TabsContent value="sales" className="h-[300px] px-4 pt-0 pb-4">
             <ChartContainer config={chartConfig}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sortedBySales} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
+                <AreaChart data={sortedBySales} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={gradientColors.sales[0]} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={gradientColors.sales[1]} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#e0f2f1" 
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
+                  />
                   <YAxis 
                     tickFormatter={(value) => `₹${value / 1000}k`} 
                     domain={[0, Math.max(...sortedBySales.map(item => item.sales || 0)) * 1.2 || 40000]} 
+                    stroke="#e0f2f1"
+                    tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                    axisLine={{ stroke: '#37474f' }}
                   />
-                  <ChartTooltip
-                    content={<ChartTooltipContent />}
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                    formatter={(value: number) => [`₹${value.toFixed(2)}`, "Sales Revenue"]}
+                    labelStyle={{ color: "#e0f2f1" }}
                   />
-                  <Bar dataKey="sales" name="Sales Revenue">
-                    {sortedBySales.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <Area 
+                    type="monotone" 
+                    dataKey="sales" 
+                    name="Sales Revenue" 
+                    stroke={colors.sales}
+                    fillOpacity={1}
+                    fill="url(#salesGradient)"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
           </TabsContent>

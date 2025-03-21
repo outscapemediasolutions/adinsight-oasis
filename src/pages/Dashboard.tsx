@@ -12,14 +12,35 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "@/components/EmptyState";
+import DateRangeSelector from "@/components/DateRangeSelector";
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
   const [adData, setAdData] = useState<AdData[]>([]);
+  const [filteredData, setFilteredData] = useState<AdData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<ReturnType<typeof calculateMetrics> | null>(null);
   const [hasData, setHasData] = useState(false);
   const navigate = useNavigate();
+  
+  const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
+    if (!startDate || !endDate || adData.length === 0) return;
+    
+    // Filter data based on date range
+    const filtered = adData.filter(item => {
+      const itemDate = new Date(item.date);
+      return itemDate >= startDate && itemDate <= endDate;
+    });
+    
+    setFilteredData(filtered);
+    
+    if (filtered.length > 0) {
+      const calculatedMetrics = calculateMetrics(filtered);
+      setMetrics(calculatedMetrics);
+    }
+    
+    toast.success(`Data filtered from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+  };
   
   useEffect(() => {
     const fetchData = async () => {
@@ -29,6 +50,7 @@ const Dashboard = () => {
         setIsLoading(true);
         const data = await getAdData(currentUser.uid);
         setAdData(data);
+        setFilteredData(data); // Initialize filtered data with all data
         setHasData(data.length > 0);
         
         if (data.length > 0) {
@@ -54,6 +76,7 @@ const Dashboard = () => {
       toast.info("Refreshing data...");
       const data = await getAdData(currentUser.uid);
       setAdData(data);
+      setFilteredData(data);
       setHasData(data.length > 0);
       
       if (data.length > 0) {
@@ -112,6 +135,8 @@ const Dashboard = () => {
         </div>
       </div>
       
+      <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
+      
       <AnalyticsSummary 
         data={metrics ? {
           totalSales: metrics.totalSales,
@@ -126,7 +151,7 @@ const Dashboard = () => {
         <PerformanceChart
           title="Spend vs. Revenue"
           description="Ad spend and revenue trends over time"
-          data={adData}
+          data={filteredData}
           type="spendVsRevenue"
           isLoading={isLoading}
         />
@@ -134,7 +159,7 @@ const Dashboard = () => {
         <PerformanceChart
           title="ROAS Trend"
           description="Return on ad spend performance over time"
-          data={adData}
+          data={filteredData}
           type="roas"
           isLoading={isLoading}
         />
@@ -144,7 +169,7 @@ const Dashboard = () => {
         <PerformanceChart
           title="CPC & CPA Trends"
           description="Cost per click and cost per acquisition over time"
-          data={adData}
+          data={filteredData}
           type="cpcVsCpa"
           isLoading={isLoading}
         />
@@ -152,7 +177,7 @@ const Dashboard = () => {
         <PerformanceChart
           title="CTR by Campaign"
           description="Click-through rate by campaign"
-          data={adData}
+          data={filteredData}
           type="ctr"
           isLoading={isLoading}
         />
@@ -179,7 +204,7 @@ const Dashboard = () => {
                   <div className="h-[400px]">
                     <PerformanceChart
                       title=""
-                      data={adData}
+                      data={filteredData}
                       type="campaign"
                       height={400}
                       isLoading={isLoading}
@@ -195,7 +220,7 @@ const Dashboard = () => {
                   <div className="h-[400px]">
                     <PerformanceChart
                       title=""
-                      data={adData}
+                      data={filteredData}
                       type="cvr"
                       height={400}
                       isLoading={isLoading}
@@ -211,7 +236,7 @@ const Dashboard = () => {
                   <div className="h-[400px]">
                     <PerformanceChart
                       title=""
-                      data={adData}
+                      data={filteredData}
                       type="ctr"
                       height={400}
                       isLoading={isLoading}

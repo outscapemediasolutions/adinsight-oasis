@@ -31,9 +31,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Set dark mode by default
+// Set dark mode by default and add Poppins font
 const setInitialTheme = () => {
   document.documentElement.classList.add("dark");
+  
+  // Add Poppins font
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap';
+  document.head.appendChild(link);
+  
+  // Apply font to whole document
+  document.body.classList.add('font-poppins');
 };
 
 const App = () => {

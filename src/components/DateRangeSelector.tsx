@@ -4,7 +4,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, ChevronDown } from "lucide-react";
-import { format } from "date-fns";
+import { format, isEqual } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface DateRangeProps {
@@ -28,7 +28,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
   });
   
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [activePreset, setActivePreset] = useState("Today");
+  const [activePreset, setActivePreset] = useState("Last 7 Days");
 
   // Preset date ranges
   const presets: PresetRange[] = [
@@ -89,16 +89,36 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
     const newRange = preset.value();
     setDate(newRange);
     setActivePreset(preset.name);
-    onDateRangeChange(newRange.from, newRange.to);
+    
+    if (newRange.from && newRange.to) {
+      onDateRangeChange(newRange.from, newRange.to);
+    }
+    
     setIsCalendarOpen(false);
   };
 
   // Handle date change from calendar
   const handleDateChange = (newDate: DateRange) => {
     setDate(newDate);
+    
+    // Only trigger the callback when both dates are selected
     if (newDate.from && newDate.to) {
       onDateRangeChange(newDate.from, newDate.to);
-      setActivePreset("Custom");
+      
+      // Check if the selected range matches any preset
+      const matchingPreset = presets.find(preset => {
+        const presetRange = preset.value();
+        return (
+          presetRange.from && 
+          presetRange.to && 
+          newDate.from &&
+          newDate.to &&
+          isEqual(presetRange.from, newDate.from) && 
+          isEqual(presetRange.to, newDate.to)
+        );
+      });
+      
+      setActivePreset(matchingPreset ? matchingPreset.name : "Custom");
     }
   };
 
@@ -112,7 +132,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
 
   return (
     <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-6">
-      <div className="text-sm font-medium">Date Range:</div>
+      <div className="text-sm font-medium text-white/80">Date Range:</div>
       
       <div className="flex flex-wrap gap-2">
         {presets.map((preset) => (
@@ -122,10 +142,10 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
             size="sm"
             onClick={() => handlePresetChange(preset)}
             className={cn(
-              "h-9 rounded-full transition-all",
+              "h-9 rounded-full transition-all font-medium",
               activePreset === preset.name 
                 ? "bg-adpulse-green text-adpulse-blue-dark hover:bg-adpulse-green/90" 
-                : "text-foreground/70 hover:text-foreground hover:bg-muted"
+                : "text-foreground/70 hover:text-foreground border-white/20 hover:bg-white/5"
             )}
           >
             {preset.name}
@@ -139,7 +159,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
             variant="outline"
             size="sm"
             className={cn(
-              "h-9 pl-3 pr-3 justify-between font-normal transition-all rounded-full",
+              "h-9 pl-3 pr-3 justify-between font-normal transition-all rounded-full border-white/20 hover:bg-white/5",
               activePreset === "Custom" && "border-adpulse-green text-adpulse-green bg-adpulse-green/10"
             )}
           >
@@ -158,7 +178,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
             <ChevronDown className="ml-2 h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 border border-white/10 bg-[#0B2537]" align="start">
           <Calendar
             initialFocus
             mode="range"
@@ -167,6 +187,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
             onSelect={(newDate) => handleDateChange(newDate as DateRange)}
             numberOfMonths={2}
             disabled={(date) => date > new Date()}
+            className="p-3 pointer-events-auto"
           />
         </PopoverContent>
       </Popover>
