@@ -12,10 +12,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Upload, Download, AlertTriangle, X, Check, FileText, Map } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { Progress } from "@/components/ui/progress";
 
 const CSVUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStep, setUploadStep] = useState<string>("");
+  const [showUploadingScreen, setShowUploadingScreen] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedData, setParsedData] = useState<AdData[] | null>(null);
   const [overwrite, setOverwrite] = useState(false);
@@ -72,7 +77,7 @@ const CSVUpload = () => {
   const parseCSV = async () => {
     if (!file) return;
     
-    setIsUploading(true);
+    setIsValidating(true);
     setParseError(null);
     
     try {
@@ -105,7 +110,7 @@ const CSVUpload = () => {
               setMappingDialogOpen(true);
             }
             
-            setIsUploading(false);
+            setIsValidating(false);
             return;
           }
           
@@ -139,14 +144,14 @@ const CSVUpload = () => {
           setParseError((error as Error).message);
           toast.error((error as Error).message);
         } finally {
-          setIsUploading(false);
+          setIsValidating(false);
         }
       };
       
       reader.onerror = () => {
         setParseError("Failed to read the file.");
         toast.error("Failed to read the file.");
-        setIsUploading(false);
+        setIsValidating(false);
       };
       
       reader.readAsText(file);
@@ -154,7 +159,7 @@ const CSVUpload = () => {
       console.error("CSV processing error:", error);
       setParseError("An error occurred while processing the file.");
       toast.error("An error occurred while processing the file.");
-      setIsUploading(false);
+      setIsValidating(false);
     }
   };
 
@@ -182,22 +187,48 @@ const CSVUpload = () => {
     if (!parsedData || !currentUser) return;
     
     setIsUploading(true);
+    setShowUploadingScreen(true);
+    setUploadProgress(0);
+    setUploadStep("Parsing data...");
     
     try {
       console.log("Starting upload with data:", parsedData.length, "records");
       
+      // Step 1: Prepare data
+      setUploadProgress(20);
+      setUploadStep("Processing data...");
+      await new Promise(r => setTimeout(r, 500)); // Simulate processing time
+      
+      // Step 2: Uploading
+      setUploadProgress(40);
+      setUploadStep("Uploading to database...");
+      
       await saveAdData(parsedData, currentUser.uid, overwrite, file?.name || "upload.csv");
+      
+      // Step 3: Finalizing
+      setUploadProgress(80);
+      setUploadStep("Finalizing...");
+      await new Promise(r => setTimeout(r, 500)); // Simulate finalizing
+      
       console.log("Upload completed successfully");
       
-      resetForm();
-      setDialogOpen(false);
-      toast.success("Data uploaded successfully!");
-      navigate("/");
+      // Step 4: Complete
+      setUploadProgress(100);
+      setUploadStep("Upload complete!");
+      
+      setTimeout(() => {
+        resetForm();
+        setDialogOpen(false);
+        setShowUploadingScreen(false);
+        toast.success("Data uploaded successfully!");
+        navigate("/");
+      }, 1000);
+      
     } catch (error) {
       console.error("Firebase upload error:", error);
       toast.error("Failed to upload data to the database: " + (error instanceof Error ? error.message : "Unknown error"));
-    } finally {
       setIsUploading(false);
+      setShowUploadingScreen(false);
     }
   };
 
@@ -243,6 +274,31 @@ const CSVUpload = () => {
       </span>
     );
   };
+
+  if (showUploadingScreen) {
+    return (
+      <div className="w-full h-[80vh] flex flex-col items-center justify-center font-poppins">
+        <div className="w-full max-w-2xl p-6 text-center">
+          <div className="animate-pulse mb-8">
+            <div className="w-16 h-16 mx-auto border-4 border-adpulse-green border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          
+          <h2 className="text-2xl font-semibold mb-4 font-poppins">Uploading data...</h2>
+          <p className="text-white/60 mb-8 font-poppins">Please wait while your data is being processed and uploaded.</p>
+          
+          <div className="space-y-2 mb-6">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="font-poppins">{uploadStep}</span>
+              <span className="font-poppins">{uploadProgress}%</span>
+            </div>
+            <Progress value={uploadProgress} className="h-2" />
+          </div>
+          
+          <p className="text-sm text-white/60 font-poppins">Uploading to database...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

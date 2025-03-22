@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { 
   Check, Download, File, FileText, Upload as UploadIcon, Trash2,
-  X, AlertTriangle, History, Table as TableIcon, RefreshCcw
+  X, AlertTriangle, History, Table as TableIcon, RefreshCcw, RotateCcw
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -25,10 +25,8 @@ import { useNavigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import EmptyState from "@/components/EmptyState";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDistanceToNow, format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -42,7 +40,10 @@ const UploadPage = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStep, setUploadStep] = useState<string>("");
   const [isValidated, setIsValidated] = useState(false);
+  const [showUploadingScreen, setShowUploadingScreen] = useState(false);
   const [csvData, setCsvData] = useState<string | null>(null);
   const [uploadOption, setUploadOption] = useState<"append" | "overwrite">("append");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -61,6 +62,7 @@ const UploadPage = () => {
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [parsedPreview, setParsedPreview] = useState<AdData[] | null>(null);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("upload");
   
   // Fetch upload history when component mounts
   useEffect(() => {
@@ -68,6 +70,18 @@ const UploadPage = () => {
       fetchUploadHistory();
     }
   }, [currentUser]);
+
+  // Reset upload progress when upload is finished
+  useEffect(() => {
+    if (uploadProgress === 100) {
+      const timer = setTimeout(() => {
+        setShowUploadingScreen(false);
+        setUploadProgress(0);
+        setUploadStep("");
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploadProgress]);
   
   const fetchUploadHistory = async () => {
     if (!currentUser) return;
@@ -348,10 +362,23 @@ const UploadPage = () => {
     }
     
     setIsUploading(true);
+    setShowUploadingScreen(true);
+    setUploadProgress(0);
+    setUploadStep("Parsing data...");
     
     try {
-      // Parse CSV data with column mapping if needed
+      // Step 1: Parse the data
+      setUploadProgress(10);
       const parsedData = parseCSVData(csvData, columnMapping);
+      
+      // Step 2: Processing data
+      setUploadProgress(30);
+      setUploadStep("Processing data...");
+      await new Promise(r => setTimeout(r, 500)); // Simulate processing time
+      
+      // Step 3: Uploading to database
+      setUploadProgress(50);
+      setUploadStep("Uploading to database...");
       
       // Save data to Firestore
       await saveAdData(
@@ -361,52 +388,135 @@ const UploadPage = () => {
         file.name
       );
       
+      // Step 4: Finalizing
+      setUploadProgress(80);
+      setUploadStep("Finalizing...");
+      await new Promise(r => setTimeout(r, 500)); // Simulate finalizing time
+      
+      // Step 5: Complete
+      setUploadProgress(100);
+      setUploadStep("Upload complete!");
+      
       // Reset state
-      setFile(null);
-      setCsvData(null);
-      setIsValidated(false);
-      resetValidationState();
+      setTimeout(() => {
+        setFile(null);
+        setCsvData(null);
+        setIsValidated(false);
+        resetValidationState();
+        
+        // Refresh upload history
+        fetchUploadHistory();
+        
+        toast.success("Data uploaded successfully!");
+        
+        // Navigate to dashboard
+        navigate("/");
+      }, 1000);
       
-      // Refresh upload history
-      fetchUploadHistory();
-      
-      toast.success("Data uploaded successfully!");
-      
-      // Navigate to dashboard
-      navigate("/");
     } catch (error) {
       console.error("Error uploading data:", error);
       toast.error("Failed to upload data: " + (error instanceof Error ? error.message : "Unknown error"));
-    } finally {
       setIsUploading(false);
+      setShowUploadingScreen(false);
+    }
+  };
+
+  const goToDashboard = () => {
+    navigate("/");
+  };
+
+  const handleUploadHistoryItemClick = (upload: UploadRecord) => {
+    if (upload.dateRange && upload.dateRange.start && upload.dateRange.end) {
+      navigate('/', { 
+        state: { 
+          dateRange: {
+            from: new Date(upload.dateRange.start),
+            to: new Date(upload.dateRange.end)
+          }
+        }
+      });
+    } else {
+      navigate('/');
     }
   };
   
+  if (showUploadingScreen) {
+    return (
+      <div className="max-w-4xl mx-auto w-full h-[80vh] flex flex-col items-center justify-center font-poppins">
+        <div className="w-full max-w-2xl p-6 text-center">
+          <div className="animate-pulse mb-8">
+            <div className="w-16 h-16 mx-auto border-4 border-adpulse-green border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          
+          <h2 className="text-2xl font-semibold mb-4 font-poppins">Uploading data...</h2>
+          <p className="text-white/60 mb-8 font-poppins">Please wait while your data is being processed and uploaded.</p>
+          
+          <div className="space-y-2 mb-6">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="font-poppins">{uploadStep}</span>
+              <span className="font-poppins">{uploadProgress}%</span>
+            </div>
+            <Progress value={uploadProgress} className="h-2" />
+          </div>
+          
+          <p className="text-sm text-white/60 font-poppins">Uploading to database...</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="max-w-4xl mx-auto font-poppins">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold font-poppins">Upload your Meta Ads data to track and analyze performance</h2>
-        <p className="text-white/60 mt-1 font-poppins">
-          Import your advertising data from Facebook Ads Manager to get started with AdPulse Analytics
-        </p>
+    <div className="max-w-4xl mx-auto w-full font-poppins">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-xl font-semibold font-poppins">Upload Meta Ads Data</h2>
+          <p className="text-white/60 font-poppins">Import your advertising data from Facebook Ads Manager</p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            className="bg-[#0B2537] border-white/20 font-poppins"
+            onClick={handleDownloadTemplate}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV Template
+          </Button>
+          
+          <Button 
+            className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90 font-poppins"
+            onClick={goToDashboard}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Go to Dashboard & Refresh Data
+          </Button>
+        </div>
       </div>
       
-      <Tabs defaultValue="upload" className="w-full">
-        <TabsList className="bg-[#021627]/50 mb-4 font-poppins">
-          <TabsTrigger value="upload">Upload CSV</TabsTrigger>
-          <TabsTrigger value="format">Format Requirements</TabsTrigger>
-          <TabsTrigger value="history">Upload History</TabsTrigger>
+      <Tabs 
+        defaultValue="upload" 
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
+        <TabsList className="w-full grid grid-cols-2 mb-4">
+          <TabsTrigger 
+            value="upload" 
+            className="font-poppins text-base py-3 data-[state=active]:bg-[#0B2537] data-[state=active]:text-white data-[state=active]:border-adpulse-green data-[state=active]:border-b-2 rounded-none"
+          >
+            Upload CSV
+          </TabsTrigger>
+          <TabsTrigger 
+            value="history" 
+            className="font-poppins text-base py-3 data-[state=active]:bg-[#0B2537] data-[state=active]:text-white data-[state=active]:border-adpulse-green data-[state=active]:border-b-2 rounded-none"
+          >
+            Upload History
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="upload" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
-            <CardHeader>
-              <CardTitle className="font-poppins">Upload Meta Ads Data</CardTitle>
-              <CardDescription className="font-poppins">
-                Upload a CSV file with your Meta Ads performance data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div 
                 className={`border-2 border-dashed rounded-lg p-10 text-center ${
                   isDragging 
@@ -598,97 +708,14 @@ const UploadPage = () => {
                   </div>
                 </div>
               )}
-              
-              <div className="mt-6 pt-6 border-t border-white/10 flex justify-between items-center">
-                <p className="text-sm text-white/60 font-poppins">
-                  Need the correct format? Download our template.
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleDownloadTemplate}
-                  className="bg-transparent border-white/20 font-poppins"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="format" className="mt-0">
-          <Card className="bg-[#0B2537] border-white/10">
-            <CardHeader>
-              <CardTitle className="font-poppins">Format Requirements</CardTitle>
-              <CardDescription className="font-poppins">
-                Required columns and formats for uploading Meta Ads data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-3 font-poppins">Required CSV Columns</h3>
-                  <p className="text-white/70 mb-4 font-poppins">
-                    Your CSV file must include the following columns in the exact order shown below:
-                  </p>
-                  
-                  <div className="border border-white/10 rounded-lg overflow-hidden">
-                    <table className="w-full text-left">
-                      <thead className="bg-[#021627]">
-                        <tr>
-                          <th className="px-4 py-3 text-sm font-medium font-poppins">Column Name</th>
-                          <th className="px-4 py-3 text-sm font-medium font-poppins">Data Type</th>
-                          <th className="px-4 py-3 text-sm font-medium font-poppins">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {csvHeaders.map((header, index) => (
-                          <tr key={index}>
-                            <td className="px-4 py-3 text-sm font-poppins">{header}</td>
-                            <td className="px-4 py-3 text-sm text-white/70 font-poppins">
-                              {header.toLowerCase().includes('date') ? 'Date (YYYY-MM-DD)' : 
-                               header.toLowerCase().includes('name') || header.toLowerCase().includes('status') || header.toLowerCase().includes('level') || header.toLowerCase().includes('setting') || header.toLowerCase().includes('type') ? 'Text' : 
-                               'Number'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-white/70 font-poppins">
-                              {header}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-white/70 font-poppins">
-                    For a complete template with all required columns, download our CSV template.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleDownloadTemplate}
-                    className="bg-transparent border-white/20 font-poppins"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Template
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
         
         <TabsContent value="history" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="font-poppins">Upload History</CardTitle>
-                <CardDescription className="font-poppins">
-                  View, download or delete your previous data uploads
-                </CardDescription>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <h3 className="text-xl font-semibold font-poppins">Upload History</h3>
               
               <Button 
                 variant="outline" 
@@ -715,78 +742,82 @@ const UploadPage = () => {
                 />
               ) : (
                 <div className="space-y-4">
-                  <Table>
-                    <TableHeader className="bg-[#021627]">
-                      <TableRow>
-                        <TableHead className="font-poppins">File Name</TableHead>
-                        <TableHead className="font-poppins">Date Uploaded</TableHead>
-                        <TableHead className="font-poppins">Records</TableHead>
-                        <TableHead className="font-poppins">Date Range</TableHead>
-                        <TableHead className="font-poppins">Status</TableHead>
-                        <TableHead className="text-right font-poppins">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {uploadHistory.map((upload) => (
-                        <TableRow key={upload.id}>
-                          <TableCell className="font-medium font-poppins">{upload.fileName}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-poppins">{format(new Date(upload.uploadedAt), "MMM d, yyyy")}</span>
-                              <span className="text-xs text-white/60 font-poppins">
-                                {formatDistanceToNow(new Date(upload.uploadedAt), { addSuffix: true })}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-poppins">{upload.recordCount}</TableCell>
-                          <TableCell className="font-poppins">
-                            {upload.dateRange ? (
-                              <span>{upload.dateRange.start} to {upload.dateRange.end}</span>
-                            ) : (
-                              <span className="text-white/60">No date range</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={upload.status === "completed" ? "default" : "outline"} className="font-poppins">
-                              {upload.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUpload(upload);
-                                  setDownloadDialogOpen(true);
-                                }}
-                                className="bg-transparent border-white/20 font-poppins"
-                              >
-                                <Download className="h-4 w-4 mr-1" />
-                                Download
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUpload(upload);
-                                  setDeleteDialogOpen(true);
-                                }}
-                                className="bg-transparent border-white/20 font-poppins text-red-400 hover:text-red-300"
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            </div>
-                          </TableCell>
+                  <div className="border border-white/10 rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-[#021627]">
+                        <TableRow>
+                          <TableHead className="font-poppins">Date</TableHead>
+                          <TableHead className="font-poppins">File Name</TableHead>
+                          <TableHead className="font-poppins">Data Range</TableHead>
+                          <TableHead className="font-poppins text-center">Rows</TableHead>
+                          <TableHead className="font-poppins text-center">Status</TableHead>
+                          <TableHead className="font-poppins text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  
-                  <p className="text-sm text-white/60 mt-2 font-poppins">
-                    Note: All uploaded data can be downloaded or deleted at any time.
-                  </p>
+                      </TableHeader>
+                      <TableBody>
+                        {uploadHistory.map((upload) => (
+                          <TableRow 
+                            key={upload.id} 
+                            className="cursor-pointer hover:bg-white/5"
+                            onClick={() => handleUploadHistoryItemClick(upload)}
+                          >
+                            <TableCell>
+                              <div className="font-poppins">
+                                {format(new Date(upload.uploadedAt), "yyyy-MM-dd")}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4 text-adpulse-green" />
+                                <span className="font-poppins">{upload.fileName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-poppins">
+                              {upload.dateRange && upload.dateRange.start && upload.dateRange.end ? (
+                                `${upload.dateRange.start} - ${upload.dateRange.end}`
+                              ) : (
+                                <span className="text-white/40">Invalid date - Invalid date</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center font-poppins">
+                              {upload.recordCount} rows
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600/20 text-green-500 font-poppins">
+                                success
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => {
+                                    setSelectedUpload(upload);
+                                    setDownloadDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 text-white/70 hover:text-white"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => {
+                                    setSelectedUpload(upload);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 text-red-400 hover:text-red-300"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -887,7 +918,7 @@ const UploadPage = () => {
                   <div className="font-poppins">{selectedUpload?.recordCount || 0}</div>
                   <div className="text-white/60 font-poppins">Date Range:</div>
                   <div className="font-poppins">
-                    {selectedUpload?.dateRange
+                    {selectedUpload?.dateRange && selectedUpload.dateRange.start && selectedUpload.dateRange.end
                       ? `${selectedUpload.dateRange.start} to ${selectedUpload.dateRange.end}`
                       : "Unknown"}
                   </div>
@@ -972,7 +1003,7 @@ const UploadPage = () => {
               <div className="font-poppins">{selectedUpload?.recordCount || 0}</div>
               <div className="text-white/60 font-poppins">Date Range:</div>
               <div className="font-poppins">
-                {selectedUpload?.dateRange
+                {selectedUpload?.dateRange && selectedUpload.dateRange.start && selectedUpload.dateRange.end
                   ? `${selectedUpload.dateRange.start} to ${selectedUpload.dateRange.end}`
                   : "Unknown"}
               </div>
