@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { 
-  Check, Download, File, FileText, Upload as UploadIcon, 
-  X, AlertTriangle, History, Table as TableIcon 
+  Check, Download, File, FileText, Upload as UploadIcon, Trash2,
+  X, AlertTriangle, History, Table as TableIcon, RefreshCcw
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -14,6 +14,7 @@ import {
   generateCSVTemplate, 
   getUserUploads,
   downloadHistoricalData,
+  deleteUpload,
   validateCSVHeaders,
   UploadRecord,
   AdData,
@@ -24,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import EmptyState from "@/components/EmptyState";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDistanceToNow, format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const UploadPage = () => {
   const { currentUser } = useAuth();
@@ -51,10 +53,12 @@ const UploadPage = () => {
   const [uploadHistory, setUploadHistory] = useState<UploadRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUpload, setSelectedUpload] = useState<UploadRecord | null>(null);
   const [downloadFormat, setDownloadFormat] = useState<"csv" | "json">("csv");
   const [downloadInProgress, setDownloadInProgress] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [parsedPreview, setParsedPreview] = useState<AdData[] | null>(null);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   
@@ -131,12 +135,36 @@ const UploadPage = () => {
       toast.success(`Data downloaded successfully as ${downloadFormat.toUpperCase()}`);
     } catch (error) {
       console.error("Error downloading data:", error);
-      toast.error("Failed to download data");
+      toast.error("Failed to download data: " + (error instanceof Error ? error.message : "Unknown error"));
       setDownloadInProgress(false);
       setDownloadProgress(0);
     }
   };
   
+  const handleDeleteUpload = async () => {
+    if (!selectedUpload || !currentUser) return;
+    
+    setDeleteInProgress(true);
+    
+    try {
+      const success = await deleteUpload(currentUser.uid, selectedUpload.id);
+      
+      if (success) {
+        // Refresh upload history
+        fetchUploadHistory();
+        toast.success("Upload deleted successfully");
+      } else {
+        toast.error("Failed to delete upload");
+      }
+    } catch (error) {
+      console.error("Error deleting upload:", error);
+      toast.error("Failed to delete upload: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setDeleteInProgress(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -355,16 +383,16 @@ const UploadPage = () => {
   };
   
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto font-poppins">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold">Upload your Meta Ads data to track and analyze performance</h2>
-        <p className="text-white/60 mt-1">
+        <h2 className="text-xl font-semibold font-poppins">Upload your Meta Ads data to track and analyze performance</h2>
+        <p className="text-white/60 mt-1 font-poppins">
           Import your advertising data from Facebook Ads Manager to get started with AdPulse Analytics
         </p>
       </div>
       
       <Tabs defaultValue="upload" className="w-full">
-        <TabsList className="bg-[#021627]/50 mb-4">
+        <TabsList className="bg-[#021627]/50 mb-4 font-poppins">
           <TabsTrigger value="upload">Upload CSV</TabsTrigger>
           <TabsTrigger value="format">Format Requirements</TabsTrigger>
           <TabsTrigger value="history">Upload History</TabsTrigger>
@@ -373,8 +401,8 @@ const UploadPage = () => {
         <TabsContent value="upload" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle>Upload Meta Ads Data</CardTitle>
-              <CardDescription>
+              <CardTitle className="font-poppins">Upload Meta Ads Data</CardTitle>
+              <CardDescription className="font-poppins">
                 Upload a CSV file with your Meta Ads performance data
               </CardDescription>
             </CardHeader>
@@ -402,11 +430,11 @@ const UploadPage = () => {
                   <div className="p-3 rounded-full bg-[#021627]">
                     <FileText className="h-10 w-10 text-adpulse-green/80" />
                   </div>
-                  <h3 className="text-lg font-medium">Upload CSV File</h3>
-                  <p className="text-white/60 max-w-md text-sm">
+                  <h3 className="text-lg font-medium font-poppins">Upload CSV File</h3>
+                  <p className="text-white/60 max-w-md text-sm font-poppins">
                     Drag and drop or click to browse
                   </p>
-                  <Button variant="outline" size="sm" className="mt-2 bg-transparent border-white/20">
+                  <Button variant="outline" size="sm" className="mt-2 bg-transparent border-white/20 font-poppins">
                     Choose File
                   </Button>
                 </div>
@@ -417,13 +445,13 @@ const UploadPage = () => {
                   <div className="flex items-center p-3 border border-white/10 rounded-lg bg-[#021627]">
                     <File className="h-6 w-6 text-adpulse-green/80 mr-3" />
                     <div className="flex-1 truncate">
-                      <p className="font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-white/60">{Math.round(file.size / 1024)} KB</p>
+                      <p className="font-medium truncate font-poppins">{file.name}</p>
+                      <p className="text-xs text-white/60 font-poppins">{Math.round(file.size / 1024)} KB</p>
                     </div>
                     {isValidated ? (
                       <div className="flex items-center text-adpulse-green">
                         <Check className="h-5 w-5 mr-1" />
-                        <span className="text-sm">Valid</span>
+                        <span className="text-sm font-poppins">Valid</span>
                       </div>
                     ) : (
                       <Button 
@@ -434,7 +462,7 @@ const UploadPage = () => {
                           validateFile();
                         }}
                         disabled={isValidating}
-                        className="bg-transparent border-white/20"
+                        className="bg-transparent border-white/20 font-poppins"
                       >
                         {isValidating ? "Validating..." : "Validate File"}
                       </Button>
@@ -460,9 +488,9 @@ const UploadPage = () => {
                 <div className="mt-6">
                   <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
                     <AlertTriangle className="h-5 w-5 text-red-500" />
-                    <AlertTitle>Validation Errors</AlertTitle>
+                    <AlertTitle className="font-poppins">Validation Errors</AlertTitle>
                     <AlertDescription>
-                      <ul className="list-disc pl-5 text-sm space-y-1 mt-1">
+                      <ul className="list-disc pl-5 text-sm space-y-1 mt-1 font-poppins">
                         {validationErrors.map((error, index) => (
                           <li key={index}>{error}</li>
                         ))}
@@ -476,9 +504,9 @@ const UploadPage = () => {
                 <div className="mt-6">
                   <Alert className="bg-yellow-500/10 border-yellow-500/20">
                     <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                    <AlertTitle>Warnings</AlertTitle>
+                    <AlertTitle className="font-poppins">Warnings</AlertTitle>
                     <AlertDescription>
-                      <ul className="list-disc pl-5 text-sm space-y-1 mt-1">
+                      <ul className="list-disc pl-5 text-sm space-y-1 mt-1 font-poppins">
                         {validationWarnings.map((warning, index) => (
                           <li key={index}>{warning}</li>
                         ))}
@@ -490,26 +518,26 @@ const UploadPage = () => {
               
               {parsedPreview && parsedPreview.length > 0 && (
                 <div className="mt-6">
-                  <h4 className="text-sm font-medium mb-2">Data Preview</h4>
+                  <h4 className="text-sm font-medium mb-2 font-poppins">Data Preview</h4>
                   <div className="border border-white/10 rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader className="bg-[#021627]">
                         <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Campaign</TableHead>
-                          <TableHead>Ad Set</TableHead>
-                          <TableHead className="text-right">Spent</TableHead>
-                          <TableHead className="text-right">Results</TableHead>
+                          <TableHead className="font-poppins">Date</TableHead>
+                          <TableHead className="font-poppins">Campaign</TableHead>
+                          <TableHead className="font-poppins">Ad Set</TableHead>
+                          <TableHead className="text-right font-poppins">Spent</TableHead>
+                          <TableHead className="text-right font-poppins">Results</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {parsedPreview.map((row, index) => (
                           <TableRow key={index}>
-                            <TableCell>{row.date}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{row.campaignName}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{row.adSetName}</TableCell>
-                            <TableCell className="text-right">₹{row.amountSpent.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">{row.results}</TableCell>
+                            <TableCell className="font-poppins">{row.date}</TableCell>
+                            <TableCell className="max-w-[150px] truncate font-poppins">{row.campaignName}</TableCell>
+                            <TableCell className="max-w-[150px] truncate font-poppins">{row.adSetName}</TableCell>
+                            <TableCell className="text-right font-poppins">₹{row.amountSpent.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-poppins">{row.results}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -522,11 +550,11 @@ const UploadPage = () => {
                 <div className="mt-6 space-y-4">
                   <div className="bg-adpulse-green/10 border border-adpulse-green/20 rounded-lg p-3 flex items-center">
                     <Check className="h-5 w-5 text-adpulse-green mr-2" />
-                    <p className="text-sm">File is valid and ready to upload</p>
+                    <p className="text-sm font-poppins">File is valid and ready to upload</p>
                   </div>
                   
                   <div className="p-4 border border-white/10 rounded-lg bg-[#021627]">
-                    <h4 className="text-sm font-medium mb-3">Upload Options</h4>
+                    <h4 className="text-sm font-medium mb-3 font-poppins">Upload Options</h4>
                     <RadioGroup 
                       value={uploadOption} 
                       onValueChange={(value) => setUploadOption(value as "append" | "overwrite")}
@@ -535,10 +563,10 @@ const UploadPage = () => {
                       <div className="flex items-start space-x-2">
                         <RadioGroupItem value="append" id="append" />
                         <div className="grid gap-1">
-                          <Label htmlFor="append" className="font-medium">
+                          <Label htmlFor="append" className="font-medium font-poppins">
                             Append data (add to existing data)
                           </Label>
-                          <p className="text-xs text-white/60">
+                          <p className="text-xs text-white/60 font-poppins">
                             Add this data to your existing dataset. Duplicate entries will be skipped.
                           </p>
                         </div>
@@ -547,10 +575,10 @@ const UploadPage = () => {
                       <div className="flex items-start space-x-2">
                         <RadioGroupItem value="overwrite" id="overwrite" />
                         <div className="grid gap-1">
-                          <Label htmlFor="overwrite" className="font-medium">
+                          <Label htmlFor="overwrite" className="font-medium font-poppins">
                             Overwrite data (replace existing data for matching dates)
                           </Label>
-                          <p className="text-xs text-white/60">
+                          <p className="text-xs text-white/60 font-poppins">
                             Replace existing data for the same date, campaign, and ad set combinations.
                           </p>
                         </div>
@@ -562,7 +590,7 @@ const UploadPage = () => {
                     <Button 
                       onClick={uploadFile} 
                       disabled={isUploading}
-                      className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90"
+                      className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90 font-poppins"
                     >
                       <UploadIcon className="h-4 w-4 mr-2" />
                       {isUploading ? "Uploading..." : "Upload File"}
@@ -572,14 +600,14 @@ const UploadPage = () => {
               )}
               
               <div className="mt-6 pt-6 border-t border-white/10 flex justify-between items-center">
-                <p className="text-sm text-white/60">
+                <p className="text-sm text-white/60 font-poppins">
                   Need the correct format? Download our template.
                 </p>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={handleDownloadTemplate}
-                  className="bg-transparent border-white/20"
+                  className="bg-transparent border-white/20 font-poppins"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download Template
@@ -592,16 +620,16 @@ const UploadPage = () => {
         <TabsContent value="format" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle>Format Requirements</CardTitle>
-              <CardDescription>
+              <CardTitle className="font-poppins">Format Requirements</CardTitle>
+              <CardDescription className="font-poppins">
                 Required columns and formats for uploading Meta Ads data
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium mb-3">Required CSV Columns</h3>
-                  <p className="text-white/70 mb-4">
+                  <h3 className="text-lg font-medium mb-3 font-poppins">Required CSV Columns</h3>
+                  <p className="text-white/70 mb-4 font-poppins">
                     Your CSV file must include the following columns in the exact order shown below:
                   </p>
                   
@@ -609,21 +637,21 @@ const UploadPage = () => {
                     <table className="w-full text-left">
                       <thead className="bg-[#021627]">
                         <tr>
-                          <th className="px-4 py-3 text-sm font-medium">Column Name</th>
-                          <th className="px-4 py-3 text-sm font-medium">Data Type</th>
-                          <th className="px-4 py-3 text-sm font-medium">Description</th>
+                          <th className="px-4 py-3 text-sm font-medium font-poppins">Column Name</th>
+                          <th className="px-4 py-3 text-sm font-medium font-poppins">Data Type</th>
+                          <th className="px-4 py-3 text-sm font-medium font-poppins">Description</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/10">
                         {csvHeaders.map((header, index) => (
                           <tr key={index}>
-                            <td className="px-4 py-3 text-sm">{header}</td>
-                            <td className="px-4 py-3 text-sm text-white/70">
+                            <td className="px-4 py-3 text-sm font-poppins">{header}</td>
+                            <td className="px-4 py-3 text-sm text-white/70 font-poppins">
                               {header.toLowerCase().includes('date') ? 'Date (YYYY-MM-DD)' : 
                                header.toLowerCase().includes('name') || header.toLowerCase().includes('status') || header.toLowerCase().includes('level') || header.toLowerCase().includes('setting') || header.toLowerCase().includes('type') ? 'Text' : 
                                'Number'}
                             </td>
-                            <td className="px-4 py-3 text-sm text-white/70">
+                            <td className="px-4 py-3 text-sm text-white/70 font-poppins">
                               {header}
                             </td>
                           </tr>
@@ -634,14 +662,14 @@ const UploadPage = () => {
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <p className="text-sm text-white/70">
+                  <p className="text-sm text-white/70 font-poppins">
                     For a complete template with all required columns, download our CSV template.
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleDownloadTemplate}
-                    className="bg-transparent border-white/20"
+                    className="bg-transparent border-white/20 font-poppins"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download Template
@@ -654,11 +682,24 @@ const UploadPage = () => {
         
         <TabsContent value="history" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
-            <CardHeader>
-              <CardTitle>Upload History</CardTitle>
-              <CardDescription>
-                View and download your previous data uploads
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="font-poppins">Upload History</CardTitle>
+                <CardDescription className="font-poppins">
+                  View, download or delete your previous data uploads
+                </CardDescription>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchUploadHistory}
+                disabled={loadingHistory}
+                className="bg-transparent border-white/20 font-poppins"
+              >
+                <RefreshCcw className={`h-4 w-4 mr-2 ${loadingHistory ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </CardHeader>
             <CardContent>
               {loadingHistory ? (
@@ -677,52 +718,74 @@ const UploadPage = () => {
                   <Table>
                     <TableHeader className="bg-[#021627]">
                       <TableRow>
-                        <TableHead>File Name</TableHead>
-                        <TableHead>Date Uploaded</TableHead>
-                        <TableHead>Records</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="font-poppins">File Name</TableHead>
+                        <TableHead className="font-poppins">Date Uploaded</TableHead>
+                        <TableHead className="font-poppins">Records</TableHead>
+                        <TableHead className="font-poppins">Date Range</TableHead>
+                        <TableHead className="font-poppins">Status</TableHead>
+                        <TableHead className="text-right font-poppins">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {uploadHistory.map((upload) => (
                         <TableRow key={upload.id}>
-                          <TableCell className="font-medium">{upload.fileName}</TableCell>
+                          <TableCell className="font-medium font-poppins">{upload.fileName}</TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span>{format(new Date(upload.uploadedAt), "MMM d, yyyy")}</span>
-                              <span className="text-xs text-white/60">
+                              <span className="font-poppins">{format(new Date(upload.uploadedAt), "MMM d, yyyy")}</span>
+                              <span className="text-xs text-white/60 font-poppins">
                                 {formatDistanceToNow(new Date(upload.uploadedAt), { addSuffix: true })}
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell>{upload.recordCount}</TableCell>
+                          <TableCell className="font-poppins">{upload.recordCount}</TableCell>
+                          <TableCell className="font-poppins">
+                            {upload.dateRange ? (
+                              <span>{upload.dateRange.start} to {upload.dateRange.end}</span>
+                            ) : (
+                              <span className="text-white/60">No date range</span>
+                            )}
+                          </TableCell>
                           <TableCell>
-                            <Badge variant={upload.status === "completed" ? "default" : "outline"}>
+                            <Badge variant={upload.status === "completed" ? "default" : "outline"} className="font-poppins">
                               {upload.status}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedUpload(upload);
-                                setDownloadDialogOpen(true);
-                              }}
-                              className="bg-transparent border-white/20"
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUpload(upload);
+                                  setDownloadDialogOpen(true);
+                                }}
+                                className="bg-transparent border-white/20 font-poppins"
+                              >
+                                <Download className="h-4 w-4 mr-1" />
+                                Download
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUpload(upload);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                className="bg-transparent border-white/20 font-poppins text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                   
-                  <p className="text-sm text-white/60 mt-2">
-                    Note: Historical data is available for download for up to 90 days.
+                  <p className="text-sm text-white/60 mt-2 font-poppins">
+                    Note: All uploaded data can be downloaded or deleted at any time.
                   </p>
                 </div>
               )}
@@ -735,8 +798,8 @@ const UploadPage = () => {
       <Dialog open={columnMappingOpen} onOpenChange={setColumnMappingOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Map Columns</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-poppins">Map Columns</DialogTitle>
+            <DialogDescription className="font-poppins">
               Some required columns are missing or have different names. Please map your CSV columns to the required ones.
             </DialogDescription>
           </DialogHeader>
@@ -746,13 +809,13 @@ const UploadPage = () => {
               {headerMismatch.map((mismatch, index) => (
                 <div key={index} className="grid grid-cols-2 gap-4 items-center">
                   <div>
-                    <Label className="mb-1 block">Required Column</Label>
-                    <div className="p-2 bg-slate-800 rounded border border-white/10">
+                    <Label className="mb-1 block font-poppins">Required Column</Label>
+                    <div className="p-2 bg-slate-800 rounded border border-white/10 font-poppins">
                       {mismatch.required}
                     </div>
                   </div>
                   <div>
-                    <Label className="mb-1 block">Map From</Label>
+                    <Label className="mb-1 block font-poppins">Map From</Label>
                     <Select
                       value={mismatch.original || "none"}
                       onValueChange={(value) => {
@@ -761,13 +824,13 @@ const UploadPage = () => {
                         setHeaderMismatch(updated);
                       }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full font-poppins">
                         <SelectValue placeholder="Select a column" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="none" className="font-poppins">None</SelectItem>
                         {availableColumns.map((column, idx) => (
-                          <SelectItem key={idx} value={column}>{column}</SelectItem>
+                          <SelectItem key={idx} value={column} className="font-poppins">{column}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -781,14 +844,14 @@ const UploadPage = () => {
             <Button 
               variant="outline" 
               onClick={() => setColumnMappingOpen(false)}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
             <Button 
               onClick={applyColumnMapping}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               <Check className="mr-2 h-4 w-4" />
               Apply Mapping
@@ -801,33 +864,39 @@ const UploadPage = () => {
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Download Data</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-poppins">Download Data</DialogTitle>
+            <DialogDescription className="font-poppins">
               Download the data from your previous upload.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label className="mb-2 block">File Details</Label>
+              <Label className="mb-2 block font-poppins">File Details</Label>
               <div className="rounded-lg bg-[#021627] p-3 border border-white/10">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-white/60">File Name:</div>
-                  <div>{selectedUpload?.fileName || "Unknown"}</div>
-                  <div className="text-white/60">Uploaded:</div>
-                  <div>
+                  <div className="text-white/60 font-poppins">File Name:</div>
+                  <div className="font-poppins">{selectedUpload?.fileName || "Unknown"}</div>
+                  <div className="text-white/60 font-poppins">Uploaded:</div>
+                  <div className="font-poppins">
                     {selectedUpload
                       ? format(new Date(selectedUpload.uploadedAt), "MMM d, yyyy h:mm a")
                       : "Unknown"}
                   </div>
-                  <div className="text-white/60">Record Count:</div>
-                  <div>{selectedUpload?.recordCount || 0}</div>
+                  <div className="text-white/60 font-poppins">Record Count:</div>
+                  <div className="font-poppins">{selectedUpload?.recordCount || 0}</div>
+                  <div className="text-white/60 font-poppins">Date Range:</div>
+                  <div className="font-poppins">
+                    {selectedUpload?.dateRange
+                      ? `${selectedUpload.dateRange.start} to ${selectedUpload.dateRange.end}`
+                      : "Unknown"}
+                  </div>
                 </div>
               </div>
             </div>
             
             <div>
-              <Label className="mb-2 block">Download Format</Label>
+              <Label className="mb-2 block font-poppins">Download Format</Label>
               <RadioGroup 
                 value={downloadFormat} 
                 onValueChange={(value) => setDownloadFormat(value as "csv" | "json")}
@@ -835,11 +904,11 @@ const UploadPage = () => {
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="csv" id="csv" />
-                  <Label htmlFor="csv">CSV</Label>
+                  <Label htmlFor="csv" className="font-poppins">CSV</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="json" id="json" />
-                  <Label htmlFor="json">JSON</Label>
+                  <Label htmlFor="json" className="font-poppins">JSON</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -848,7 +917,7 @@ const UploadPage = () => {
           {downloadInProgress && (
             <div className="space-y-2">
               <Progress value={downloadProgress} className="h-2" />
-              <p className="text-xs text-white/60 text-center">
+              <p className="text-xs text-white/60 text-center font-poppins">
                 {downloadProgress === 100 ? "Download complete!" : "Preparing download..."}
               </p>
             </div>
@@ -859,14 +928,14 @@ const UploadPage = () => {
               variant="outline"
               onClick={() => setDownloadDialogOpen(false)}
               disabled={downloadInProgress}
-              className="mr-2"
+              className="mr-2 font-poppins"
             >
               Cancel
             </Button>
             <Button
               onClick={handleHistoricalDownload}
               disabled={downloadInProgress}
-              className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90"
+              className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90 font-poppins"
             >
               {downloadInProgress ? (
                 <>
@@ -883,6 +952,57 @@ const UploadPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-poppins">
+              Delete Upload
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-poppins">
+              Are you sure you want to delete this upload and all its associated data? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-2 mb-6 rounded-lg bg-[#0B2537] p-3 border border-white/10">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="text-white/60 font-poppins">File Name:</div>
+              <div className="font-poppins">{selectedUpload?.fileName || "Unknown"}</div>
+              <div className="text-white/60 font-poppins">Records:</div>
+              <div className="font-poppins">{selectedUpload?.recordCount || 0}</div>
+              <div className="text-white/60 font-poppins">Date Range:</div>
+              <div className="font-poppins">
+                {selectedUpload?.dateRange
+                  ? `${selectedUpload.dateRange.start} to ${selectedUpload.dateRange.end}`
+                  : "Unknown"}
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="font-poppins">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteUpload();
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white font-poppins"
+              disabled={deleteInProgress}
+            >
+              {deleteInProgress ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-r-transparent rounded-full animate-spin mr-2"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Upload
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

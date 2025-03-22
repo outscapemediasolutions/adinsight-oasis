@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   addDoc, 
@@ -10,7 +11,8 @@ import {
   Timestamp,
   orderBy,
   getDoc,
-  serverTimestamp
+  serverTimestamp,
+  DocumentReference
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { toast } from "sonner";
@@ -51,6 +53,7 @@ export interface AdData {
   reportingStarts: string;
   reportingEnds: string;
   userId: string;
+  uploadId?: string; // Reference to the upload batch
 }
 
 // Upload Record interface
@@ -273,7 +276,7 @@ export const parseCSVData = (csvData: string, customColumnMapping: Record<string
         userId: "", // Will be set when saving to Firestore
       };
       
-      console.log(`Row ${i} - Amount Spent: ${adData.amountSpent}, CPM: ${adData.cpm}`);
+      console.log(`Row ${i} - Amount Spent: ${adData.amountSpent}, CPM: ${adData.cpm}, Date: ${adData.date}`);
       
       // Validate data
       if (!validateDataRow(adData)) {
@@ -322,7 +325,11 @@ const validateDataRow = (data: AdData): boolean => {
       const parsedDate = new Date(data.date);
       if (!isNaN(parsedDate.getTime())) {
         // It's a valid date, but not in the expected format
-        // Let's accept it anyway
+        // Let's standardize the date format to YYYY-MM-DD
+        const year = parsedDate.getFullYear();
+        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(parsedDate.getDate()).padStart(2, '0');
+        data.date = `${year}-${month}-${day}`;
         return true;
       }
       return false;
@@ -357,7 +364,7 @@ export const saveAdData = async (
       }
     };
     
-    console.log("Creating upload record");
+    console.log("Creating upload record with date range:", uploadRecord.dateRange);
     const uploadRef = await addDoc(collection(db, "uploads"), uploadRecord);
     console.log("Upload record created with ID:", uploadRef.id);
     
@@ -365,34 +372,52 @@ export const saveAdData = async (
     let savedCount = 0;
     let skippedCount = 0;
     
-    for (const item of data) {
-      item.userId = userId;
-      
-      const existingQuery = query(
-        collection(db, "adData"),
-        where("userId", "==", userId),
-        where("date", "==", item.date),
-        where("campaignName", "==", item.campaignName),
-        where("adSetName", "==", item.adSetName)
-      );
-      
-      const existingDocs = await getDocs(existingQuery);
-      
-      if (!existingDocs.empty) {
-        // Data already exists
-        if (overwrite) {
-          // Update existing document
-          const docId = existingDocs.docs[0].id;
-          await updateDoc(doc(db, "adData", docId), { ...item });
-          savedCount++;
+    // Batch process records for efficiency
+    const batchSize = 100;
+    const batches = [];
+    
+    for (let i = 0; i < data.length; i += batchSize) {
+      const batch = data.slice(i, i + batchSize);
+      batches.push(batch);
+    }
+    
+    for (const batch of batches) {
+      for (const item of batch) {
+        item.userId = userId;
+        item.uploadId = uploadRef.id; // Reference to the upload record
+        
+        const existingQuery = query(
+          collection(db, "adData"),
+          where("userId", "==", userId),
+          where("date", "==", item.date),
+          where("campaignName", "==", item.campaignName),
+          where("adSetName", "==", item.adSetName)
+        );
+        
+        const existingDocs = await getDocs(existingQuery);
+        
+        if (!existingDocs.empty) {
+          // Data already exists
+          if (overwrite) {
+            // Update existing document
+            const docId = existingDocs.docs[0].id;
+            await updateDoc(doc(db, "adData", docId), { 
+              ...item,
+              updatedAt: Date.now()
+            });
+            savedCount++;
+          } else {
+            // Skip this item
+            skippedCount++;
+          }
         } else {
-          // Skip this item
-          skippedCount++;
+          // Add new document
+          await addDoc(collection(db, "adData"), {
+            ...item,
+            createdAt: Date.now()
+          });
+          savedCount++;
         }
-      } else {
-        // Add new document
-        await addDoc(collection(db, "adData"), item);
-        savedCount++;
       }
     }
     
@@ -401,7 +426,8 @@ export const saveAdData = async (
     // Update the upload record with final status
     await updateDoc(doc(db, "uploads", uploadRef.id), {
       status: 'completed',
-      recordCount: savedCount
+      recordCount: savedCount,
+      id: uploadRef.id
     });
     
     // Show success message
@@ -424,6 +450,7 @@ export const saveAdData = async (
 // Get user's upload history
 export const getUserUploads = async (userId: string): Promise<UploadRecord[]> => {
   try {
+    console.log("Fetching upload history for user:", userId);
     const q = query(
       collection(db, "uploads"),
       where("userId", "==", userId),
@@ -440,10 +467,60 @@ export const getUserUploads = async (userId: string): Promise<UploadRecord[]> =>
       } as UploadRecord);
     });
     
+    console.log(`Found ${uploads.length} upload records`);
     return uploads;
   } catch (error) {
     console.error("Error getting upload history:", error);
     throw error;
+  }
+};
+
+// Delete an upload record and its associated data
+export const deleteUpload = async (userId: string, uploadId: string): Promise<boolean> => {
+  try {
+    console.log(`Deleting upload ${uploadId} for user ${userId}`);
+    
+    // Verify the upload exists and belongs to the user
+    const uploadDoc = await getDoc(doc(db, "uploads", uploadId));
+    
+    if (!uploadDoc.exists()) {
+      toast.error("Upload record not found");
+      return false;
+    }
+    
+    const uploadData = uploadDoc.data() as UploadRecord;
+    
+    if (uploadData.userId !== userId) {
+      toast.error("You don't have permission to delete this upload");
+      return false;
+    }
+    
+    // Find all ad data associated with this upload
+    const adDataQuery = query(
+      collection(db, "adData"),
+      where("userId", "==", userId),
+      where("uploadId", "==", uploadId)
+    );
+    
+    const adDataSnapshot = await getDocs(adDataQuery);
+    
+    // Delete all ad data documents
+    let deletedCount = 0;
+    for (const docSnapshot of adDataSnapshot.docs) {
+      await deleteDoc(doc(db, "adData", docSnapshot.id));
+      deletedCount++;
+    }
+    
+    // Delete the upload record itself
+    await deleteDoc(doc(db, "uploads", uploadId));
+    
+    console.log(`Deleted upload record and ${deletedCount} associated data records`);
+    toast.success("Upload and associated data deleted successfully");
+    return true;
+  } catch (error) {
+    console.error("Error deleting upload:", error);
+    toast.error("Failed to delete upload. Please try again.");
+    return false;
   }
 };
 
@@ -454,6 +531,7 @@ export const downloadHistoricalData = async (
   format: "csv" | "json" = "csv"
 ) => {
   try {
+    console.log(`Downloading data for upload ${uploadId} in ${format} format`);
     // First get the upload record
     const uploadDoc = await getDoc(doc(db, "uploads", uploadId));
     
@@ -468,27 +546,35 @@ export const downloadHistoricalData = async (
       throw new Error("You don't have permission to access this data");
     }
     
-    // Get the actual data
+    // Get the actual data - first try to get by uploadId if available
     let q = query(
       collection(db, "adData"),
       where("userId", "==", userId)
     );
     
-    // Add date range filter if available
-    if (uploadData.dateRange?.start && uploadData.dateRange?.end) {
+    // If the data has uploadId field, use it for faster retrieval
+    q = query(q, where("uploadId", "==", uploadId));
+    
+    let querySnapshot = await getDocs(q);
+    
+    // If no results, fall back to date range filter
+    if (querySnapshot.empty && uploadData.dateRange?.start && uploadData.dateRange?.end) {
       q = query(
-        q, 
+        collection(db, "adData"),
+        where("userId", "==", userId),
         where("date", ">=", uploadData.dateRange.start),
         where("date", "<=", uploadData.dateRange.end)
       );
+      
+      querySnapshot = await getDocs(q);
     }
-    
-    const querySnapshot = await getDocs(q);
     
     const data: AdData[] = [];
     querySnapshot.forEach((doc) => {
       data.push(doc.data() as AdData);
     });
+    
+    console.log(`Found ${data.length} records to download`);
     
     // Format and download the data
     let downloadContent: string;
@@ -497,11 +583,11 @@ export const downloadHistoricalData = async (
     
     if (format === "csv") {
       downloadContent = convertToCSV(data);
-      fileName = `adpulse_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      fileName = `adpulse_export_${uploadData.fileName.replace('.csv', '')}_${new Date().toISOString().slice(0, 10)}.csv`;
       mimeType = "text/csv";
     } else {
       downloadContent = JSON.stringify(data, null, 2);
-      fileName = `adpulse_export_${new Date().toISOString().slice(0, 10)}.json`;
+      fileName = `adpulse_export_${uploadData.fileName.replace('.csv', '')}_${new Date().toISOString().slice(0, 10)}.json`;
       mimeType = "application/json";
     }
     
@@ -575,9 +661,8 @@ const convertToCSV = (data: AdData[]): string => {
 
 // Generate CSV template
 export const generateCSVTemplate = (): string => {
-  // Ensure that CPM is written as one column
-  const headers = [...csvHeaders];
-  return headers.join(',');
+  // Return a proper CSV header with all required columns
+  return csvHeaders.join(',');
 };
 
 // Get ad data from Firestore

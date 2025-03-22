@@ -4,7 +4,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, ChevronDown } from "lucide-react";
-import { format, isEqual } from "date-fns";
+import { format, isEqual, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface DateRangeProps {
@@ -84,6 +84,14 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
     },
   ];
 
+  // Format date for Firebase query (YYYY-MM-DD)
+  const formatDateForQuery = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Handle preset change
   const handlePresetChange = (preset: PresetRange) => {
     const newRange = preset.value();
@@ -91,8 +99,10 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
     setActivePreset(preset.name);
     
     if (newRange.from && newRange.to) {
+      // Ensure dates are passed in the correct format
       onDateRangeChange(newRange.from, newRange.to);
-      console.log(`DateRangeSelector: Selected preset ${preset.name} - ${format(newRange.from, 'yyyy-MM-dd')} to ${format(newRange.to, 'yyyy-MM-dd')}`);
+      
+      console.log(`DateRangeSelector: Selected preset ${preset.name} - ${formatDateForQuery(newRange.from)} to ${formatDateForQuery(newRange.to)}`);
     }
     
     setIsCalendarOpen(false);
@@ -106,8 +116,10 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
     
     // Only trigger the callback when both dates are selected
     if (newDate.from && newDate.to) {
+      // Ensure dates are passed in the correct format
       onDateRangeChange(newDate.from, newDate.to);
-      console.log(`DateRangeSelector: Selected date range ${format(newDate.from, 'yyyy-MM-dd')} to ${format(newDate.to, 'yyyy-MM-dd')}`);
+      
+      console.log(`DateRangeSelector: Selected date range ${formatDateForQuery(newDate.from)} to ${formatDateForQuery(newDate.to)}`);
       
       // Check if the selected range matches any preset
       const matchingPreset = presets.find(preset => {
@@ -133,8 +145,9 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
       const range = last7Days.value();
       setDate(range);
       if (range.from && range.to) {
+        // Make sure to trigger the callback with the initial date range
         onDateRangeChange(range.from, range.to);
-        console.log(`DateRangeSelector: Initial range set to ${format(range.from, 'yyyy-MM-dd')} to ${format(range.to, 'yyyy-MM-dd')}`);
+        console.log(`DateRangeSelector: Initial range set to ${formatDateForQuery(range.from)} to ${formatDateForQuery(range.to)}`);
       }
     }
   }, []);
@@ -147,7 +160,8 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
           size="sm"
           className={cn(
             "h-9 pl-3 pr-3 justify-between font-normal transition-all rounded-md border-white/20 hover:bg-white/5",
-            activePreset === "Custom" && "border-adpulse-green text-adpulse-green bg-adpulse-green/10"
+            activePreset === "Custom" && "border-adpulse-green text-adpulse-green bg-adpulse-green/10",
+            "font-poppins"
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />

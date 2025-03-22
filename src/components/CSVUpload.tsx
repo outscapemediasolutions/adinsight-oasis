@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,9 +94,15 @@ const CSVUpload = () => {
             const hasCPMPart2 = headerValidation.mappedHeaders.some(h => h.includes("000 impressions)"));
             
             if (hasCPMPart1 && hasCPMPart2) {
+              // Auto-map the CPM columns
+              setCustomColumnMapping(prev => ({
+                ...prev,
+                "CPM (cost per 1": "CPM (cost per 1,000 impressions)",
+                "000 impressions)": "CPM (cost per 1,000 impressions)"
+              }));
               setMappingDialogOpen(true);
             } else {
-              toast.error("CSV format is invalid. Missing required columns.");
+              setMappingDialogOpen(true);
             }
             
             setIsUploading(false);
@@ -243,16 +248,16 @@ const CSVUpload = () => {
     <div className="space-y-6 animate-fade-in">
       <Card className="glass-card">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center text-xl font-semibold">
+          <CardTitle className="flex items-center text-xl font-semibold font-poppins">
             <FileText className="mr-2 h-5 w-5 text-adpulse-green" />
             Upload Meta Ads Data
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="font-poppins">
             Upload your Meta Ads CSV data for analysis and tracking.
             <Button 
               variant="link" 
               onClick={goToAdvancedUpload} 
-              className="text-adpulse-green px-0 hover:no-underline"
+              className="text-adpulse-green px-0 hover:no-underline font-poppins"
             >
               Use advanced upload features
             </Button>
@@ -262,44 +267,44 @@ const CSVUpload = () => {
         <CardContent>
           <Tabs defaultValue="upload" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upload">Upload CSV</TabsTrigger>
-              <TabsTrigger value="template">Format Requirements</TabsTrigger>
+              <TabsTrigger value="upload" className="font-poppins">Upload CSV</TabsTrigger>
+              <TabsTrigger value="template" className="font-poppins">Format Requirements</TabsTrigger>
             </TabsList>
             
             <TabsContent value="upload" className="pt-4">
               <div className="space-y-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="csv-file">Select CSV File</Label>
+                  <Label htmlFor="csv-file" className="font-poppins">Select CSV File</Label>
                   <Input
                     id="csv-file"
                     type="file"
                     accept=".csv"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    className="cursor-pointer"
+                    className="cursor-pointer font-poppins"
                   />
                 </div>
                 
                 {parseError && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{parseError}</AlertDescription>
+                    <AlertTitle className="font-poppins">Error</AlertTitle>
+                    <AlertDescription className="font-poppins">{parseError}</AlertDescription>
                   </Alert>
                 )}
                 
                 {file && (
                   <Alert variant="default" className="bg-muted">
                     <FileText className="h-4 w-4" />
-                    <AlertTitle>Selected File</AlertTitle>
+                    <AlertTitle className="font-poppins">Selected File</AlertTitle>
                     <AlertDescription className="flex items-center justify-between">
-                      <span>{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
+                      <span className="font-poppins">{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={openColumnMappingDialog}
-                          className="h-8 px-2 py-1 text-xs"
+                          className="h-8 px-2 py-1 text-xs font-poppins"
                         >
                           <Map className="h-3 w-3 mr-1" />
                           Map Columns
@@ -321,7 +326,7 @@ const CSVUpload = () => {
             
             <TabsContent value="template" className="pt-4">
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-poppins">
                   Your CSV file must include the following columns:
                 </p>
                 
@@ -330,7 +335,7 @@ const CSVUpload = () => {
                     {csvHeaders.map((header, index) => (
                       <div 
                         key={index} 
-                        className="text-xs py-1 px-2 border border-white/10 rounded bg-muted/50"
+                        className="text-xs py-1 px-2 border border-white/10 rounded bg-muted/50 font-poppins"
                       >
                         {header}
                       </div>
@@ -340,7 +345,7 @@ const CSVUpload = () => {
                 
                 <Button 
                   onClick={downloadTemplate}
-                  className="w-full"
+                  className="w-full font-poppins"
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Download Template
@@ -354,7 +359,7 @@ const CSVUpload = () => {
           <Button
             onClick={parseCSV}
             disabled={!file || isUploading}
-            className="w-full"
+            className="w-full font-poppins"
           >
             {isUploading ? (
               <>
@@ -375,32 +380,52 @@ const CSVUpload = () => {
       <Dialog open={mappingDialogOpen} onOpenChange={setMappingDialogOpen}>
         <DialogContent className="sm:max-w-md glass-card">
           <DialogHeader>
-            <DialogTitle>Map CSV Columns</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-poppins">Map CSV Columns</DialogTitle>
+            <DialogDescription className="font-poppins">
               Map your CSV columns to the required format. This helps when your column names are different.
             </DialogDescription>
           </DialogHeader>
           
           <div className="max-h-[300px] overflow-y-auto py-4">
             <div className="space-y-4">
-              <p className="text-sm font-medium text-white">Column Mapping</p>
+              <p className="text-sm font-medium text-white font-poppins">Column Mapping</p>
               
               <div className="space-y-2">
                 {detectedHeaders.length > 0 && (
                   <div className="grid gap-4">
                     {detectedHeaders.map((header, index) => {
-                      // Skip already recognized headers
-                      const isAlreadyRecognized = csvHeaders.some(
+                      // Skip empty headers
+                      if (!header.trim()) return null;
+                      
+                      // Check if this header is already mapped correctly
+                      const isStandardHeader = csvHeaders.some(
                         required => required.toLowerCase() === header.toLowerCase()
                       );
                       
-                      if (isAlreadyRecognized) return null;
+                      // If it's a standard header, show it as already mapped
+                      if (isStandardHeader) {
+                        const matchingHeader = csvHeaders.find(
+                          h => h.toLowerCase() === header.toLowerCase()
+                        );
+                        return (
+                          <div key={index} className="grid grid-cols-2 gap-2 items-center">
+                            <div className="text-sm truncate font-poppins">{header}</div>
+                            <div className="flex items-center">
+                              <span className="bg-adpulse-green/20 text-adpulse-green text-xs rounded px-2 py-1 font-poppins">
+                                Mapped to {matchingHeader}
+                              </span>
+                              <Check className="ml-2 h-4 w-4 text-adpulse-green" />
+                            </div>
+                          </div>
+                        );
+                      }
                       
+                      // Otherwise, show mapping dropdown
                       return (
                         <div key={index} className="grid grid-cols-2 gap-2 items-center">
-                          <div className="text-sm truncate">{header}</div>
+                          <div className="text-sm truncate font-poppins">{header}</div>
                           <select
-                            className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
+                            className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm font-poppins"
                             value={customColumnMapping[header] || ""}
                             onChange={(e) => handleColumnMappingChange(header, e.target.value)}
                           >
@@ -415,34 +440,39 @@ const CSVUpload = () => {
                       );
                     })}
                     
-                    {/* Show specific mapping for CPM which might be split */}
-                    <div className="border-t border-white/10 pt-2 mt-2">
-                      <p className="text-xs text-adpulse-green mb-2">
-                        Special Case: If "CPM (cost per 1,000 impressions)" is split across multiple columns, map both to the same target.
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 items-center">
-                        <div className="text-sm truncate">CPM (cost per 1 part)</div>
-                        <select
-                          className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
-                          value={customColumnMapping["CPM (cost per 1"] || ""}
-                          onChange={(e) => handleColumnMappingChange("CPM (cost per 1", e.target.value)}
-                        >
-                          <option value="">-- Select Target --</option>
-                          <option value="CPM (cost per 1,000 impressions)">CPM (cost per 1,000 impressions)</option>
-                        </select>
+                    {/* Special case for split CPM column */}
+                    {detectedHeaders.includes("CPM (cost per 1") && detectedHeaders.includes("000 impressions)") && (
+                      <div className="mt-4 p-3 border border-adpulse-green/20 bg-adpulse-green/5 rounded-md">
+                        <p className="text-xs text-adpulse-green mb-2 font-poppins">
+                          <Check className="inline-block mr-1 h-3 w-3" />
+                          Split CPM column detected and automatically mapped.
+                        </p>
+                        <div className="text-xs font-poppins">
+                          "CPM (cost per 1" + "000 impressions)" → "CPM (cost per 1,000 impressions)"
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 items-center mt-2">
-                        <div className="text-sm truncate">000 impressions) part</div>
-                        <select
-                          className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
-                          value={customColumnMapping["000 impressions)"] || ""}
-                          onChange={(e) => handleColumnMappingChange("000 impressions)", e.target.value)}
-                        >
-                          <option value="">-- Select Target --</option>
-                          <option value="CPM (cost per 1,000 impressions)">CPM (cost per 1,000 impressions)</option>
-                        </select>
+                    )}
+                    
+                    {/* Missing required columns section */}
+                    {csvHeaders.some(required => 
+                      !detectedHeaders.some(h => h.toLowerCase() === required.toLowerCase()) && 
+                      !Object.values(customColumnMapping).includes(required)
+                    ) && (
+                      <div className="mt-4 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-md">
+                        <p className="text-xs text-yellow-500 mb-2 font-poppins">
+                          <AlertTriangle className="inline-block mr-1 h-3 w-3" />
+                          Missing required columns:
+                        </p>
+                        <div className="space-y-1">
+                          {csvHeaders.filter(required => 
+                            !detectedHeaders.some(h => h.toLowerCase() === required.toLowerCase()) &&
+                            !Object.values(customColumnMapping).includes(required)
+                          ).map((missing, idx) => (
+                            <div key={idx} className="text-xs font-poppins">{missing}</div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -453,14 +483,14 @@ const CSVUpload = () => {
             <Button 
               variant="outline" 
               onClick={() => setMappingDialogOpen(false)}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
             <Button 
               onClick={applyColumnMappingAndContinue}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               <Check className="mr-2 h-4 w-4" />
               Apply Mapping & Continue
@@ -473,8 +503,8 @@ const CSVUpload = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md glass-card">
           <DialogHeader>
-            <DialogTitle>Data Preview</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-poppins">Data Preview</DialogTitle>
+            <DialogDescription className="font-poppins">
               Your CSV file has been parsed successfully. Review the data before uploading.
             </DialogDescription>
           </DialogHeader>
@@ -483,16 +513,16 @@ const CSVUpload = () => {
             <div className="space-y-2">
               {parsedData && (
                 <>
-                  <div className="text-xs font-medium text-muted-foreground">
+                  <div className="text-xs font-medium text-muted-foreground font-poppins">
                     {parsedData.length} rows were parsed successfully.
                   </div>
                   
                   {validationWarnings.length > 0 && (
                     <Alert className="bg-yellow-500/10 border-yellow-500/20">
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      <AlertTitle>Warnings</AlertTitle>
+                      <AlertTitle className="font-poppins">Warnings</AlertTitle>
                       <AlertDescription>
-                        <ul className="list-disc pl-5 text-[10px] space-y-1 mt-1">
+                        <ul className="list-disc pl-5 text-[10px] space-y-1 mt-1 font-poppins">
                           {validationWarnings.map((warning, index) => (
                             <li key={index}>{warning}</li>
                           ))}
@@ -505,26 +535,26 @@ const CSVUpload = () => {
                     <table className="w-full text-xs">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="p-2 text-left">Date</th>
-                          <th className="p-2 text-left">Campaign</th>
-                          <th className="p-2 text-left">Ad Set</th>
-                          <th className="p-2 text-right">Spend</th>
-                          <th className="p-2 text-right">Results</th>
+                          <th className="p-2 text-left font-poppins">Date</th>
+                          <th className="p-2 text-left font-poppins">Campaign</th>
+                          <th className="p-2 text-left font-poppins">Ad Set</th>
+                          <th className="p-2 text-right font-poppins">Spend</th>
+                          <th className="p-2 text-right font-poppins">Results</th>
                         </tr>
                       </thead>
                       <tbody>
                         {parsedData.slice(0, 5).map((row, index) => (
                           <tr key={index} className="border-t">
-                            <td className="p-2">{row.date}</td>
-                            <td className="p-2">{row.campaignName.substring(0, 15)}...</td>
-                            <td className="p-2">{row.adSetName.substring(0, 15)}...</td>
-                            <td className="p-2 text-right">₹{row.amountSpent.toFixed(2)}</td>
-                            <td className="p-2 text-right">{row.results}</td>
+                            <td className="p-2 font-poppins">{row.date}</td>
+                            <td className="p-2 font-poppins">{row.campaignName.substring(0, 15)}...</td>
+                            <td className="p-2 font-poppins">{row.adSetName.substring(0, 15)}...</td>
+                            <td className="p-2 text-right font-poppins">₹{row.amountSpent.toFixed(2)}</td>
+                            <td className="p-2 text-right font-poppins">{row.results}</td>
                           </tr>
                         ))}
                         {parsedData.length > 5 && (
                           <tr className="border-t">
-                            <td colSpan={5} className="p-2 text-center text-muted-foreground">
+                            <td colSpan={5} className="p-2 text-center text-muted-foreground font-poppins">
                               ...and {parsedData.length - 5} more rows
                             </td>
                           </tr>
@@ -544,11 +574,11 @@ const CSVUpload = () => {
                 checked={overwrite}
                 onCheckedChange={setOverwrite}
               />
-              <Label htmlFor="overwrite" className="text-sm">
+              <Label htmlFor="overwrite" className="text-sm font-poppins">
                 Overwrite existing data
               </Label>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground font-poppins">
               {overwrite ? "Will update existing entries" : "Will skip duplicate entries"}
             </div>
           </div>
@@ -557,7 +587,7 @@ const CSVUpload = () => {
             <Button 
               variant="outline" 
               onClick={() => setDialogOpen(false)}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               <X className="mr-2 h-4 w-4" />
               Cancel
@@ -565,7 +595,7 @@ const CSVUpload = () => {
             <Button 
               onClick={uploadToFirebase} 
               disabled={isUploading}
-              className="sm:w-auto w-full"
+              className="sm:w-auto w-full font-poppins"
             >
               {isUploading ? (
                 <>
