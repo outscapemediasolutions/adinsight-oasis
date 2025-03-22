@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EmptyState from "@/components/EmptyState";
 import DateRangeSelector from "@/components/DateRangeSelector";
+import { format } from "date-fns";
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -21,25 +22,38 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<ReturnType<typeof calculateMetrics> | null>(null);
   const [hasData, setHasData] = useState(false);
+  const [dateRange, setDateRange] = useState<{start?: Date, end?: Date}>({});
   const navigate = useNavigate();
   
   const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
-    if (!startDate || !endDate || adData.length === 0) return;
+    if (!startDate || !endDate) return;
+    
+    setDateRange({ start: startDate, end: endDate });
+    
+    // Convert dates to string format for filtering
+    const formatDateToString = (date: Date) => {
+      return format(date, 'yyyy-MM-dd');
+    };
+    
+    const startDateStr = formatDateToString(startDate);
+    const endDateStr = formatDateToString(endDate);
+    
+    console.log(`Filtering by date range: ${startDateStr} to ${endDateStr}`);
     
     // Filter data based on date range
-    const filtered = adData.filter(item => {
-      const itemDate = new Date(item.date);
-      return itemDate >= startDate && itemDate <= endDate;
-    });
-    
-    setFilteredData(filtered);
-    
-    if (filtered.length > 0) {
-      const calculatedMetrics = calculateMetrics(filtered);
-      setMetrics(calculatedMetrics);
+    if (adData.length > 0) {
+      const filtered = adData.filter(item => {
+        return item.date >= startDateStr && item.date <= endDateStr;
+      });
+      
+      console.log(`Filtered data from ${adData.length} to ${filtered.length} items`);
+      setFilteredData(filtered);
+      
+      if (filtered.length > 0) {
+        const calculatedMetrics = calculateMetrics(filtered);
+        setMetrics(calculatedMetrics);
+      }
     }
-    
-    toast.success(`Data filtered from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
   };
   
   useEffect(() => {
@@ -49,6 +63,7 @@ const Dashboard = () => {
       try {
         setIsLoading(true);
         const data = await getAdData(currentUser.uid);
+        console.log(`Fetched ${data.length} records`);
         setAdData(data);
         setFilteredData(data); // Initialize filtered data with all data
         setHasData(data.length > 0);
@@ -75,17 +90,35 @@ const Dashboard = () => {
       setIsLoading(true);
       toast.info("Refreshing data...");
       const data = await getAdData(currentUser.uid);
+      
       setAdData(data);
-      setFilteredData(data);
       setHasData(data.length > 0);
       
-      if (data.length > 0) {
-        const calculatedMetrics = calculateMetrics(data);
-        setMetrics(calculatedMetrics);
-        toast.success("Data refreshed successfully");
+      // Apply date filtering if a range is selected
+      if (dateRange.start && dateRange.end) {
+        const startDateStr = format(dateRange.start, 'yyyy-MM-dd');
+        const endDateStr = format(dateRange.end, 'yyyy-MM-dd');
+        
+        const filtered = data.filter(item => {
+          return item.date >= startDateStr && item.date <= endDateStr;
+        });
+        
+        setFilteredData(filtered);
+        
+        if (filtered.length > 0) {
+          const calculatedMetrics = calculateMetrics(filtered);
+          setMetrics(calculatedMetrics);
+        }
       } else {
-        toast.info("No data available");
+        setFilteredData(data);
+        
+        if (data.length > 0) {
+          const calculatedMetrics = calculateMetrics(data);
+          setMetrics(calculatedMetrics);
+        }
       }
+      
+      toast.success("Data refreshed successfully");
     } catch (error) {
       console.error("Error refreshing data:", error);
       toast.error("Failed to refresh data");
@@ -114,6 +147,7 @@ const Dashboard = () => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Performance Overview</h2>
         <div className="flex items-center gap-2">
+          <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
           <Button 
             variant="outline" 
             size="sm"
@@ -134,8 +168,6 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
-      
-      <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
       
       <AnalyticsSummary 
         data={metrics ? {

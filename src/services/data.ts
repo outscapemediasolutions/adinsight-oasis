@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   addDoc, 
@@ -104,6 +105,16 @@ export const csvHeaders = [
   "Reporting ends"
 ];
 
+// Column mapping configuration to handle variations in input names
+export const columnMappings: Record<string, string> = {
+  // Map alternative column names to standard ones
+  "Amount spent": "Amount spent (INR)",
+  "CPM (cost per 1": "CPM (cost per 1,000 impressions)",
+  "000 impressions)": "CPM (cost per 1,000 impressions)", // In case it splits into two columns
+  "CPM": "CPM (cost per 1,000 impressions)",
+  // Add more mappings as needed
+};
+
 // Validate CSV headers
 export const validateCSVHeaders = (csvData: string) => {
   const lines = csvData.split('\n');
@@ -111,13 +122,22 @@ export const validateCSVHeaders = (csvData: string) => {
   // Get headers from the first line
   const headers = lines[0].split(',').map(header => header.trim());
   
+  console.log("Validating headers:", headers);
+  
+  // Apply column mappings to standardize header names
+  const normalizedHeaders = headers.map(header => {
+    return columnMappings[header] || header;
+  });
+  
+  console.log("Normalized headers:", normalizedHeaders);
+  
   // Find missing headers
   const missingHeaders = csvHeaders.filter(required => 
-    !headers.some(header => header.toLowerCase() === required.toLowerCase())
+    !normalizedHeaders.some(header => header.toLowerCase() === required.toLowerCase())
   );
   
   // Find unknown headers
-  const unknownHeaders = headers.filter(header => 
+  const unknownHeaders = normalizedHeaders.filter(header => 
     !csvHeaders.some(required => required.toLowerCase() === header.toLowerCase())
   );
   
@@ -125,15 +145,18 @@ export const validateCSVHeaders = (csvData: string) => {
     isValid: missingHeaders.length === 0,
     missingHeaders,
     unknownHeaders,
+    mappedHeaders: normalizedHeaders
   };
 };
 
 // Parse CSV data and return structured data
-export const parseCSVData = (csvData: string, columnMapping: Record<string, string> = {}): AdData[] => {
+export const parseCSVData = (csvData: string, customColumnMapping: Record<string, string> = {}): AdData[] => {
   const lines = csvData.split('\n');
   
   // Check if the CSV has headers
   const originalHeaders = lines[0].split(',').map(header => header.trim());
+  
+  console.log("Original CSV headers:", originalHeaders);
   
   // Create a mapping of indexes for column mapping
   const headerIndexMap: Record<string, number> = {};
@@ -141,24 +164,34 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
   // First, map the original headers to their indices
   originalHeaders.forEach((header, index) => {
     headerIndexMap[header] = index;
+    
+    // Also map any known alternative names for this header
+    for (const [alt, standard] of Object.entries(columnMappings)) {
+      if (standard === header || header.includes(alt)) {
+        headerIndexMap[standard] = index;
+      }
+    }
   });
   
-  // Special case for column headers with long names
-  // Map longer version to shorter ones to be more flexible with input
-  const headerMappings: Record<string, string> = {
-    "CPM (cost per 1,000 impressions)": "CPM (cost per 1,000 impressions)",
-    "CPC (cost per link click)": "CPC (cost per link click)",
-    "CTR (all)": "CTR (all)",
-    "CPC (all)": "CPC (all)",
-    "Clicks (all)": "Clicks (all)",
-    "Purchase ROAS (return on ad spend)": "Purchase ROAS (return on ad spend)"
-  };
-  
-  // Apply any custom column mappings
-  for (const [originalCol, mappedCol] of Object.entries(columnMapping)) {
+  // Apply any custom column mappings provided
+  for (const [originalCol, mappedCol] of Object.entries(customColumnMapping)) {
     if (headerIndexMap[originalCol] !== undefined) {
       // We're remapping this column to a standard one
       headerIndexMap[mappedCol] = headerIndexMap[originalCol];
+    }
+  }
+  
+  console.log("Header index map:", headerIndexMap);
+  
+  // Handle special case for CPM which might be split across columns
+  if (headerIndexMap["CPM (cost per 1,000 impressions)"] === undefined) {
+    // Check if we have both parts of the split column
+    const cpmPart1Index = originalHeaders.findIndex(h => h.includes("CPM (cost per 1"));
+    const cpmPart2Index = originalHeaders.findIndex(h => h.includes("000 impressions)"));
+    
+    if (cpmPart1Index !== -1 && cpmPart2Index !== -1 && cpmPart1Index + 1 === cpmPart2Index) {
+      console.log("Detected split CPM column, will handle specially");
+      headerIndexMap["CPM (cost per 1,000 impressions)"] = cpmPart1Index;
     }
   }
   
@@ -170,12 +203,27 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
     
     const values = lines[i].split(',').map(value => value.trim());
     
-    if (values.length !== originalHeaders.length) {
-      console.warn(`Row ${i} has an incorrect number of columns (${values.length} vs expected ${originalHeaders.length}).`);
+    if (values.length < originalHeaders.length) {
+      console.warn(`Row ${i} has an incorrect number of columns (${values.length} vs expected ${originalHeaders.length}). Skipping.`);
       continue; // Skip invalid rows
     }
     
     try {
+      // Handle special case for CPM which might be split across columns
+      if (headerIndexMap["CPM (cost per 1,000 impressions)"] !== undefined && 
+          originalHeaders[headerIndexMap["CPM (cost per 1,000 impressions)"]] !== "CPM (cost per 1,000 impressions)") {
+        // We need to concatenate the two parts of the CPM value
+        const cpmPart1Index = headerIndexMap["CPM (cost per 1,000 impressions)"];
+        const cpmPart2Index = cpmPart1Index + 1;
+        
+        if (cpmPart2Index < values.length) {
+          // Combine the two parts if they got split
+          if (values[cpmPart1Index] && !values[cpmPart1Index].includes("1,000 impressions)")) {
+            values[cpmPart1Index] = values[cpmPart1Index] + " " + values[cpmPart2Index];
+          }
+        }
+      }
+      
       // Use the index mapping to get values in the correct order
       const adData: AdData = {
         date: getValueByHeader("Date", values, headerIndexMap),
@@ -214,6 +262,8 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
         userId: "", // Will be set when saving to Firestore
       };
       
+      console.log(`Row ${i} - Amount Spent: ${adData.amountSpent}, CPM: ${adData.cpm}`);
+      
       // Validate data
       if (!validateDataRow(adData)) {
         console.warn(`Row ${i} contains invalid data. Skipping.`);
@@ -231,6 +281,7 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
     throw new Error("No valid data rows found in the CSV file.");
   }
   
+  console.log(`Successfully parsed ${result.length} rows of data`);
   return result;
 };
 
@@ -238,7 +289,8 @@ export const parseCSVData = (csvData: string, columnMapping: Record<string, stri
 const getValueByHeader = (headerName: string, values: string[], headerIndexMap: Record<string, number>): string => {
   const index = headerIndexMap[headerName];
   if (index === undefined) {
-    throw new Error(`Required column '${headerName}' is missing`);
+    console.warn(`Required column '${headerName}' is missing`);
+    return "";
   }
   return values[index] || "";
 };
@@ -518,7 +570,7 @@ export const generateCSVTemplate = (): string => {
 // Get ad data from Firestore
 export const getAdData = async (userId: string, startDate?: string, endDate?: string, campaignName?: string, adSetName?: string) => {
   try {
-    console.log(`Getting ad data for user: ${userId}`);
+    console.log(`Getting ad data for user: ${userId}, date range: ${startDate || 'none'} to ${endDate || 'none'}`);
     let q = query(
       collection(db, "adData"),
       where("userId", "==", userId)
@@ -526,6 +578,7 @@ export const getAdData = async (userId: string, startDate?: string, endDate?: st
     
     // Add date range filter if provided
     if (startDate && endDate) {
+      console.log(`Filtering by date range: ${startDate} to ${endDate}`);
       q = query(q, where("date", ">=", startDate), where("date", "<=", endDate));
     }
     

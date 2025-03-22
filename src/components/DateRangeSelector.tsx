@@ -131,67 +131,64 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
   }, []);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-6">
-      <div className="text-sm font-medium text-white/80">Date Range:</div>
-      
-      <div className="flex flex-wrap gap-2">
-        {presets.map((preset) => (
-          <Button
-            key={preset.name}
-            variant={activePreset === preset.name ? "default" : "outline"}
-            size="sm"
-            onClick={() => handlePresetChange(preset)}
-            className={cn(
-              "h-9 rounded-full transition-all font-medium",
-              activePreset === preset.name 
-                ? "bg-adpulse-green text-adpulse-blue-dark hover:bg-adpulse-green/90" 
-                : "text-foreground/70 hover:text-foreground border-white/20 hover:bg-white/5"
-            )}
-          >
-            {preset.name}
-          </Button>
-        ))}
-      </div>
-      
-      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "h-9 pl-3 pr-3 justify-between font-normal transition-all rounded-full border-white/20 hover:bg-white/5",
-              activePreset === "Custom" && "border-adpulse-green text-adpulse-green bg-adpulse-green/10"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "MMM d, yyyy")} - {format(date.to, "MMM d, yyyy")}
-                </>
-              ) : (
-                format(date.from, "MMM d, yyyy")
-              )
+    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-9 pl-3 pr-3 justify-between font-normal transition-all rounded-md border-white/20 hover:bg-white/5",
+            activePreset === "Custom" && "border-adpulse-green text-adpulse-green bg-adpulse-green/10"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date.from ? (
+            date.to ? (
+              <>
+                {format(date.from, "MMM d, yyyy")} - {format(date.to, "MMM d, yyyy")}
+              </>
             ) : (
-              "Pick a date"
-            )}
-            <ChevronDown className="ml-2 h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 border border-white/10 bg-[#0B2537]" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date.from}
-            selected={date}
-            onSelect={(newDate) => handleDateChange(newDate as DateRange)}
-            numberOfMonths={2}
-            disabled={(date) => date > new Date()}
-            className="p-3 pointer-events-auto"
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
+              format(date.from, "MMM d, yyyy")
+            )
+          ) : (
+            "Select date range"
+          )}
+          <ChevronDown className="ml-2 h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 border border-white/10 bg-[#0B2537]" align="end">
+        <div className="p-3 border-b border-white/10">
+          <div className="flex flex-wrap gap-1 mb-2">
+            {presets.map((preset) => (
+              <Button
+                key={preset.name}
+                variant={activePreset === preset.name ? "default" : "outline"}
+                size="sm"
+                onClick={() => handlePresetChange(preset)}
+                className={cn(
+                  "h-8 text-xs rounded transition-all font-medium",
+                  activePreset === preset.name 
+                    ? "bg-adpulse-green text-adpulse-blue-dark hover:bg-adpulse-green/90" 
+                    : "text-foreground/70 hover:text-foreground border-white/20 hover:bg-white/5"
+                )}
+              >
+                {preset.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <Calendar
+          initialFocus
+          mode="range"
+          defaultMonth={date.from}
+          selected={date}
+          onSelect={(newDate) => handleDateChange(newDate as DateRange)}
+          numberOfMonths={2}
+          disabled={(date) => date > new Date()}
+          className="p-3 pointer-events-auto"
+        />
+      </PopoverContent>
+    </Popover>
   );
 };
 

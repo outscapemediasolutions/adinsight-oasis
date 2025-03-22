@@ -8,9 +8,9 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData, csvHeaders } from "@/services/data";
+import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData, csvHeaders, columnMappings } from "@/services/data";
 import { useAuth } from "@/contexts/AuthContext";
-import { Upload, Download, AlertTriangle, X, Check, FileText } from "lucide-react";
+import { Upload, Download, AlertTriangle, X, Check, FileText, Map } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -22,6 +22,9 @@ const CSVUpload = () => {
   const [overwrite, setOverwrite] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
+  const [customColumnMapping, setCustomColumnMapping] = useState<Record<string, string>>({});
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   
@@ -35,11 +38,35 @@ const CSVUpload = () => {
       setParseError(null);
       setParsedData(null);
       setValidationWarnings([]);
+      
+      // Extract headers from file to prepare for mapping
+      extractHeadersFromFile(selectedFile);
     } else {
       setFile(null);
       setParseError("Please select a valid CSV file.");
       toast.error("Please select a valid CSV file.");
     }
+  };
+  
+  // Extract CSV headers from the file
+  const extractHeadersFromFile = (selectedFile: File) => {
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      try {
+        const csvData = event.target?.result as string;
+        const lines = csvData.split('\n');
+        if (lines.length > 0) {
+          const headers = lines[0].split(',').map(header => header.trim());
+          setDetectedHeaders(headers);
+          console.log("Detected headers:", headers);
+        }
+      } catch (error) {
+        console.error("Error extracting headers:", error);
+      }
+    };
+    
+    reader.readAsText(selectedFile);
   };
 
   // Parse CSV data
@@ -62,13 +89,23 @@ const CSVUpload = () => {
           if (!headerValidation.isValid) {
             console.log("Missing headers:", headerValidation.missingHeaders);
             setParseError(`Missing required columns: ${headerValidation.missingHeaders.join(", ")}`);
-            toast.error("CSV format is invalid. Missing required columns.");
+            
+            // Check if we have a CPM column split issue
+            const hasCPMPart1 = headerValidation.mappedHeaders.some(h => h.includes("CPM (cost per 1"));
+            const hasCPMPart2 = headerValidation.mappedHeaders.some(h => h.includes("000 impressions)"));
+            
+            if (hasCPMPart1 && hasCPMPart2) {
+              setMappingDialogOpen(true);
+            } else {
+              toast.error("CSV format is invalid. Missing required columns.");
+            }
+            
             setIsUploading(false);
             return;
           }
           
           try {
-            const data = parseCSVData(csvData);
+            const data = parseCSVData(csvData, customColumnMapping);
             
             if (data.length === 0) {
               setParseError("No valid data found in the CSV file.");
@@ -114,6 +151,25 @@ const CSVUpload = () => {
       toast.error("An error occurred while processing the file.");
       setIsUploading(false);
     }
+  };
+
+  // Open column mapping dialog
+  const openColumnMappingDialog = () => {
+    setMappingDialogOpen(true);
+  };
+  
+  // Handle column mapping changes
+  const handleColumnMappingChange = (originalHeader: string, targetHeader: string) => {
+    setCustomColumnMapping(prev => ({
+      ...prev,
+      [originalHeader]: targetHeader
+    }));
+  };
+  
+  // Apply column mapping and continue
+  const applyColumnMappingAndContinue = () => {
+    setMappingDialogOpen(false);
+    parseCSV();
   };
 
   // Upload parsed data to Firebase
@@ -163,6 +219,7 @@ const CSVUpload = () => {
     setParseError(null);
     setParsedData(null);
     setValidationWarnings([]);
+    setCustomColumnMapping({});
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -237,14 +294,25 @@ const CSVUpload = () => {
                     <AlertTitle>Selected File</AlertTitle>
                     <AlertDescription className="flex items-center justify-between">
                       <span>{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={resetForm}
-                        className="h-6 w-6"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={openColumnMappingDialog}
+                          className="h-8 px-2 py-1 text-xs"
+                        >
+                          <Map className="h-3 w-3 mr-1" />
+                          Map Columns
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={resetForm}
+                          className="h-6 w-6"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </AlertDescription>
                   </Alert>
                 )}
@@ -254,7 +322,7 @@ const CSVUpload = () => {
             <TabsContent value="template" className="pt-4">
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Your CSV file must include the following columns in exactly this order:
+                  Your CSV file must include the following columns:
                 </p>
                 
                 <div className="bg-card border rounded-md p-4 overflow-auto max-h-[400px]">
@@ -303,6 +371,105 @@ const CSVUpload = () => {
         </CardFooter>
       </Card>
       
+      {/* Column Mapping Dialog */}
+      <Dialog open={mappingDialogOpen} onOpenChange={setMappingDialogOpen}>
+        <DialogContent className="sm:max-w-md glass-card">
+          <DialogHeader>
+            <DialogTitle>Map CSV Columns</DialogTitle>
+            <DialogDescription>
+              Map your CSV columns to the required format. This helps when your column names are different.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[300px] overflow-y-auto py-4">
+            <div className="space-y-4">
+              <p className="text-sm font-medium text-white">Column Mapping</p>
+              
+              <div className="space-y-2">
+                {detectedHeaders.length > 0 && (
+                  <div className="grid gap-4">
+                    {detectedHeaders.map((header, index) => {
+                      // Skip already recognized headers
+                      const isAlreadyRecognized = csvHeaders.some(
+                        required => required.toLowerCase() === header.toLowerCase()
+                      );
+                      
+                      if (isAlreadyRecognized) return null;
+                      
+                      return (
+                        <div key={index} className="grid grid-cols-2 gap-2 items-center">
+                          <div className="text-sm truncate">{header}</div>
+                          <select
+                            className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
+                            value={customColumnMapping[header] || ""}
+                            onChange={(e) => handleColumnMappingChange(header, e.target.value)}
+                          >
+                            <option value="">-- Select Target --</option>
+                            {csvHeaders.map((targetHeader, idx) => (
+                              <option key={idx} value={targetHeader}>
+                                {targetHeader}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Show specific mapping for CPM which might be split */}
+                    <div className="border-t border-white/10 pt-2 mt-2">
+                      <p className="text-xs text-adpulse-green mb-2">
+                        Special Case: If "CPM (cost per 1,000 impressions)" is split across multiple columns, map both to the same target.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 items-center">
+                        <div className="text-sm truncate">CPM (cost per 1 part)</div>
+                        <select
+                          className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
+                          value={customColumnMapping["CPM (cost per 1"] || ""}
+                          onChange={(e) => handleColumnMappingChange("CPM (cost per 1", e.target.value)}
+                        >
+                          <option value="">-- Select Target --</option>
+                          <option value="CPM (cost per 1,000 impressions)">CPM (cost per 1,000 impressions)</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 items-center mt-2">
+                        <div className="text-sm truncate">000 impressions) part</div>
+                        <select
+                          className="bg-[#0B2537] border border-white/20 rounded p-1 text-sm"
+                          value={customColumnMapping["000 impressions)"] || ""}
+                          onChange={(e) => handleColumnMappingChange("000 impressions)", e.target.value)}
+                        >
+                          <option value="">-- Select Target --</option>
+                          <option value="CPM (cost per 1,000 impressions)">CPM (cost per 1,000 impressions)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setMappingDialogOpen(false)}
+              className="sm:w-auto w-full"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+            <Button 
+              onClick={applyColumnMappingAndContinue}
+              className="sm:w-auto w-full"
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Apply Mapping & Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Data Preview Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md glass-card">
           <DialogHeader>

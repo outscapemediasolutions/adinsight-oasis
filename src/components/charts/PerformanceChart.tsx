@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Scatter, ScatterChart, Cell, PieChart, Pie } from "recharts";
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  Legend, ResponsiveContainer, ComposedChart, Area, Scatter, ScatterChart, 
+  Cell, PieChart, Pie, ReferenceLine, AreaChart
+} from "recharts";
 import { AdData, getDataByDate, calculateMetrics } from "@/services/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -17,6 +21,34 @@ interface ChartProps {
   dateFormat?: string;
 }
 
+// Custom tooltip component
+const CustomTooltip = ({ active, payload, label, labelFormatter }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#0B2537] border border-white/20 p-3 rounded shadow-md text-white font-poppins">
+        <p className="text-xs font-medium mb-1">{labelFormatter ? labelFormatter(label) : label}</p>
+        {payload.map((item: any, index: number) => (
+          <div key={index} className="flex items-center text-xs my-1">
+            <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: item.color }}></div>
+            <span className="mr-2">{item.name}:</span>
+            <span className="font-medium">
+              {typeof item.value === 'number' ? 
+                (item.unit === '₹' ? 
+                  `₹${item.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 
+                  item.unit === '%' ? 
+                    `${item.value.toFixed(2)}%` : 
+                    item.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})
+                ) : 
+                item.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 const PerformanceChart = ({ 
   title, 
   description, 
@@ -28,6 +60,11 @@ const PerformanceChart = ({
   dateFormat = "MMM d"
 }: ChartProps) => {
   const [chartData, setChartData] = useState<any[]>([]);
+  
+  // Custom gradient colors
+  const greenGradientId = `greenGradient-${Math.random().toString(36).substring(2, 9)}`;
+  const blueGradientId = `blueGradient-${Math.random().toString(36).substring(2, 9)}`;
+  const orangeGradientId = `orangeGradient-${Math.random().toString(36).substring(2, 9)}`;
   
   // Process data based on chart type
   useEffect(() => {
@@ -91,6 +128,7 @@ const PerformanceChart = ({
           return {
             campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
             ctr: metrics.ctr,
+            impressions: metrics.totalImpressions,
           };
         }).sort((a, b) => b.ctr - a.ctr);
         
@@ -119,6 +157,29 @@ const PerformanceChart = ({
         setChartData(processedData);
         break;
       }
+      case "campaign": {
+        // Group by campaign for spend vs revenue
+        const campaigns = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!campaigns.has(item.campaignName)) {
+            campaigns.set(item.campaignName, []);
+          }
+          campaigns.get(item.campaignName)?.push(item);
+        });
+        
+        const processedData = Array.from(campaigns.entries()).map(([campaign, items]) => {
+          const metrics = calculateMetrics(items);
+          return {
+            campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
+            spend: metrics.totalSpend,
+            revenue: metrics.totalSales,
+            profit: metrics.totalSales - metrics.totalSpend,
+          };
+        }).sort((a, b) => b.profit - a.profit);
+        
+        setChartData(processedData);
+        break;
+      }
       default:
         setChartData([]);
     }
@@ -141,71 +202,99 @@ const PerformanceChart = ({
     switch (type) {
       case "spendVsRevenue":
         return (
-          <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
-              <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
-              <YAxis yAxisId="left" stroke="#e0f2f1" />
-              <Tooltip 
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }}
-                formatter={(value: number) => [`₹${value.toFixed(2)}`, ""]}
-              />
-              <Legend />
-              <Bar yAxisId="left" dataKey="spend" name="Ad Spend" fill="#ff9800" barSize={20} />
-              <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#6fe394" barSize={20} />
-              <Line yAxisId="left" dataKey="profit" name="Profit" stroke="#00bcd4" strokeWidth={2} dot={{ fill: "#00bcd4", r: 4 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <div className="relative h-full">
+            <svg style={{ height: 0 }}>
+              <defs>
+                <linearGradient id={greenGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#6fe394" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#6fe394" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id={blueGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#64b5f6" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#64b5f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
+            <ResponsiveContainer width="100%" height={height}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#37474f" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
+                <YAxis stroke="#e0f2f1" />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  formatter={(value: number, name: string) => {
+                    return [value, name === "spend" ? "Ad Spend" : name === "revenue" ? "Revenue" : "Profit", "₹"];
+                  }}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="spend" name="Ad Spend" stroke="#ff9800" fill={`url(#${orangeGradientId})`} />
+                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#6fe394" fill={`url(#${greenGradientId})`} />
+                <ReferenceLine y={0} stroke="#e0f2f1" strokeDasharray="3 3" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         );
       case "roas":
         return (
-          <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
-              <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
-              <YAxis stroke="#e0f2f1" />
-              <Tooltip 
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }}
-                formatter={(value: number) => [`${value.toFixed(2)}x`, ""]}
-              />
-              <Legend />
-              <Line type="monotone" dataKey="roas" name="ROAS" stroke="#6fe394" strokeWidth={3} activeDot={{ r: 8 }} />
-              <Line type="monotone" dataKey="target" name="Target ROAS" stroke="#ffcc00" strokeWidth={2} strokeDasharray="5 5" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="relative h-full">
+            <svg style={{ height: 0 }}>
+              <defs>
+                <linearGradient id={greenGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#6fe394" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#6fe394" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
+            <ResponsiveContainer width="100%" height={height}>
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#37474f" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
+                <YAxis stroke="#e0f2f1" />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  formatter={(value: number, name: string) => {
+                    return [value, name === "roas" ? "ROAS" : "Target ROAS", ""];
+                  }}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="roas" name="ROAS" stroke="#6fe394" fill={`url(#${greenGradientId})`} strokeWidth={3} />
+                <ReferenceLine y={3} label={{ value: "Target ROAS (3x)", position: "top", fill: "#ffcc00" }} stroke="#ffcc00" strokeDasharray="5 5" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         );
       case "cpcVsCpa":
         return (
-          <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
-              <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
-              <YAxis stroke="#e0f2f1" />
-              <Tooltip 
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }}
-                formatter={(value: number) => [`₹${value.toFixed(2)}`, ""]}
-              />
-              <Legend />
-              <Line type="monotone" dataKey="cpc" name="Cost per Click" stroke="#00bcd4" strokeWidth={2} dot={{ fill: "#00bcd4", r: 4 }} />
-              <Line type="monotone" dataKey="cpa" name="Cost per Acquisition" stroke="#ff9800" strokeWidth={2} dot={{ fill: "#ff9800", r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-      case "ordersVsVisitors":
-        return (
-          <ResponsiveContainer width="100%" height={height}>
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
-              <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
-              <YAxis yAxisId="left" stroke="#e0f2f1" />
-              <YAxis yAxisId="right" orientation="right" stroke="#e0f2f1" />
-              <Tooltip contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="visitors" name="Website Visitors" fill="#00bcd4" barSize={20} />
-              <Bar yAxisId="left" dataKey="orders" name="Orders" fill="#6fe394" barSize={20} />
-              <Line yAxisId="right" dataKey="conversionRate" name="Conversion Rate (%)" stroke="#ffcc00" strokeWidth={2} dot={{ fill: "#ffcc00", r: 4 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <div className="relative h-full">
+            <svg style={{ height: 0 }}>
+              <defs>
+                <linearGradient id={blueGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#64b5f6" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#64b5f6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id={orangeGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ff9800" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#ff9800" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
+            <ResponsiveContainer width="100%" height={height}>
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#37474f" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
+                <YAxis stroke="#e0f2f1" />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  formatter={(value: number, name: string) => {
+                    return [value, name === "cpc" ? "Cost per Click" : "Cost per Acquisition", "₹"];
+                  }}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="cpc" name="Cost per Click" stroke="#64b5f6" fill={`url(#${blueGradientId})`} strokeWidth={2} />
+                <Area type="monotone" dataKey="cpa" name="Cost per Acquisition" stroke="#ff9800" fill={`url(#${orangeGradientId})`} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         );
       case "ctr":
         return (
@@ -215,8 +304,10 @@ const PerformanceChart = ({
               <XAxis type="number" stroke="#e0f2f1" domain={[0, 'auto']} tickFormatter={(value) => `${value.toFixed(1)}%`} />
               <YAxis dataKey="campaign" type="category" width={120} tick={{ fontSize: 12 }} stroke="#e0f2f1" />
               <Tooltip 
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }}
-                formatter={(value: number) => [`${value.toFixed(2)}%`, "CTR"]}
+                content={<CustomTooltip />}
+                formatter={(value: number, name: string) => {
+                  return [value, "CTR", "%"];
+                }}
               />
               <Bar dataKey="ctr" name="Click-Through Rate">
                 {chartData.map((entry, index) => {
@@ -240,16 +331,34 @@ const PerformanceChart = ({
               <XAxis dataKey="campaign" stroke="#e0f2f1" tick={{ fontSize: 11 }} tickLine={false} angle={-45} textAnchor="end" height={80} />
               <YAxis stroke="#e0f2f1" domain={[0, 'auto']} tickFormatter={(value) => `${value.toFixed(1)}%`} />
               <Tooltip 
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f" }}
-                formatter={(value: number, name) => {
-                  if (name === "cvr") return [`${value.toFixed(2)}%`, "Conversion Rate"];
-                  if (name === "spend") return [`₹${value.toFixed(2)}`, "Ad Spend"];
-                  return [value, name];
+                content={<CustomTooltip />}
+                formatter={(value: number, name: string) => {
+                  return [value, name === "cvr" ? "Conversion Rate" : "Ad Spend", name === "cvr" ? "%" : "₹"];
                 }}
               />
               <Legend />
               <Bar dataKey="cvr" name="Conversion Rate" fill="#6fe394" barSize={30} />
             </BarChart>
+          </ResponsiveContainer>
+        );
+      case "campaign":
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <ComposedChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
+              <XAxis dataKey="campaign" stroke="#e0f2f1" tick={{ fontSize: 11 }} tickLine={false} angle={-45} textAnchor="end" height={80} />
+              <YAxis yAxisId="left" stroke="#e0f2f1" />
+              <Tooltip 
+                content={<CustomTooltip />}
+                formatter={(value: number, name: string) => {
+                  return [value, name === "spend" ? "Ad Spend" : name === "revenue" ? "Revenue" : "Profit", "₹"];
+                }}
+              />
+              <Legend />
+              <Bar yAxisId="left" dataKey="spend" name="Ad Spend" fill="#ff9800" barSize={20} />
+              <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="#6fe394" barSize={20} />
+              <Line yAxisId="left" dataKey="profit" name="Profit" stroke="#64b5f6" strokeWidth={3} dot={{ fill: "#64b5f6", r: 4 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         );
       default:
@@ -262,7 +371,7 @@ const PerformanceChart = ({
   };
 
   return (
-    <Card className={cn("chart-container", className)}>
+    <Card className={cn("chart-container font-poppins", className)}>
       <CardHeader className="p-4 pb-2">
         <CardTitle className="text-lg font-medium">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
