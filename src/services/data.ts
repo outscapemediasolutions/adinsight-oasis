@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   addDoc, 
@@ -130,6 +129,18 @@ export const validateCSVHeaders = (csvData: string) => {
   });
   
   console.log("Normalized headers:", normalizedHeaders);
+  
+  // Check for CPM split across two columns
+  const cpmPart1Index = headers.findIndex(h => h === "CPM (cost per 1");
+  const cpmPart2Index = headers.findIndex(h => h === "000 impressions)");
+  
+  if (cpmPart1Index !== -1 && cpmPart2Index !== -1 && cpmPart2Index === cpmPart1Index + 1) {
+    console.log("Detected split CPM column");
+    // Replace the two headers with the correct one in the normalized headers
+    normalizedHeaders[cpmPart1Index] = "CPM (cost per 1,000 impressions)";
+    // Remove the second part
+    normalizedHeaders.splice(cpmPart2Index, 1);
+  }
   
   // Find missing headers
   const missingHeaders = csvHeaders.filter(required => 
@@ -564,7 +575,9 @@ const convertToCSV = (data: AdData[]): string => {
 
 // Generate CSV template
 export const generateCSVTemplate = (): string => {
-  return csvHeaders.join(',');
+  // Ensure that CPM is written as one column
+  const headers = [...csvHeaders];
+  return headers.join(',');
 };
 
 // Get ad data from Firestore

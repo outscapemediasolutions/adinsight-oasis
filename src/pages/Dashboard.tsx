@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAdData, calculateMetrics, AdData, getCampaignPerformance } from "@/services/data";
+import { getAdData, calculateMetrics, AdData, getCampaignPerformance, getUserUploads, downloadHistoricalData } from "@/services/data";
 import AnalyticsSummary from "@/components/dashboard/AnalyticsSummary";
 import PerformanceChart from "@/components/charts/PerformanceChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,8 @@ const Dashboard = () => {
   const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
     if (!startDate || !endDate) return;
     
+    console.log(`Dashboard: Filtering by date range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
+    
     setDateRange({ start: startDate, end: endDate });
     
     // Convert dates to string format for filtering
@@ -38,20 +40,21 @@ const Dashboard = () => {
     const startDateStr = formatDateToString(startDate);
     const endDateStr = formatDateToString(endDate);
     
-    console.log(`Filtering by date range: ${startDateStr} to ${endDateStr}`);
-    
     // Filter data based on date range
     if (adData.length > 0) {
       const filtered = adData.filter(item => {
         return item.date >= startDateStr && item.date <= endDateStr;
       });
       
-      console.log(`Filtered data from ${adData.length} to ${filtered.length} items`);
+      console.log(`Dashboard: Filtered data from ${adData.length} to ${filtered.length} items`);
       setFilteredData(filtered);
       
       if (filtered.length > 0) {
         const calculatedMetrics = calculateMetrics(filtered);
         setMetrics(calculatedMetrics);
+      } else {
+        setMetrics(null);
+        toast.warning("No data available for the selected date range");
       }
     }
   };
@@ -62,8 +65,9 @@ const Dashboard = () => {
       
       try {
         setIsLoading(true);
+        console.log("Dashboard: Fetching data");
         const data = await getAdData(currentUser.uid);
-        console.log(`Fetched ${data.length} records`);
+        console.log(`Dashboard: Fetched ${data.length} records`);
         setAdData(data);
         setFilteredData(data); // Initialize filtered data with all data
         setHasData(data.length > 0);
@@ -126,6 +130,62 @@ const Dashboard = () => {
       setIsLoading(false);
     }
   };
+
+  const handleExport = async () => {
+    if (!currentUser) return;
+    
+    try {
+      toast.info("Preparing export...");
+      
+      // Format current date for filename
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      const filename = `adpulse_export_${currentDate}.csv`;
+      
+      // Create and trigger download
+      const csvContent = convertToCSV(filteredData);
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Export complete");
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast.error("Failed to export data");
+    }
+  };
+  
+  // Helper function to convert data to CSV
+  const convertToCSV = (data: AdData[]): string => {
+    if (data.length === 0) return "";
+    
+    // Create header row from the first object's keys
+    const headers = Object.keys(data[0]).filter(key => 
+      key !== "userId" // Exclude userId from export
+    );
+    
+    const csvRows = [headers.join(',')];
+    
+    // Add data rows
+    for (const item of data) {
+      const values = headers.map(header => {
+        const value = item[header as keyof AdData];
+        // Handle strings with commas by wrapping in quotes
+        return typeof value === 'string' && value.includes(',') 
+          ? `"${value.replace(/"/g, '""')}"` 
+          : String(value);
+      });
+      csvRows.push(values.join(','));
+    }
+    
+    return csvRows.join('\n');
+  };
   
   if (!hasData && !isLoading) {
     return (
@@ -145,7 +205,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Performance Overview</h2>
+        <h2 className="text-xl font-semibold font-poppins">Performance Overview</h2>
         <div className="flex items-center gap-2">
           <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
           <Button 
@@ -162,6 +222,8 @@ const Dashboard = () => {
             variant="outline" 
             size="sm"
             className="bg-transparent border-white/20 hover:bg-white/5 text-white"
+            onClick={handleExport}
+            disabled={filteredData.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -218,15 +280,15 @@ const Dashboard = () => {
       <div className="mt-6">
         <Card className="bg-[#0B2537] border-white/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Campaign Performance</CardTitle>
+            <CardTitle className="text-lg font-medium font-poppins">Campaign Performance</CardTitle>
             <CardDescription>Compare performance across all campaigns</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="spend" className="w-full">
               <TabsList className="bg-[#021627]/50 mb-4">
-                <TabsTrigger value="spend">Spend & Revenue</TabsTrigger>
-                <TabsTrigger value="conversion">Conversion Metrics</TabsTrigger>
-                <TabsTrigger value="engagement">Engagement</TabsTrigger>
+                <TabsTrigger value="spend" className="font-poppins">Spend & Revenue</TabsTrigger>
+                <TabsTrigger value="conversion" className="font-poppins">Conversion Metrics</TabsTrigger>
+                <TabsTrigger value="engagement" className="font-poppins">Engagement</TabsTrigger>
               </TabsList>
               
               <TabsContent value="spend" className="mt-0">

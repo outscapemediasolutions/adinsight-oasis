@@ -92,18 +92,22 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
     
     if (newRange.from && newRange.to) {
       onDateRangeChange(newRange.from, newRange.to);
+      console.log(`DateRangeSelector: Selected preset ${preset.name} - ${format(newRange.from, 'yyyy-MM-dd')} to ${format(newRange.to, 'yyyy-MM-dd')}`);
     }
     
     setIsCalendarOpen(false);
   };
 
   // Handle date change from calendar
-  const handleDateChange = (newDate: DateRange) => {
+  const handleDateChange = (newDate: DateRange | undefined) => {
+    if (!newDate) return;
+    
     setDate(newDate);
     
     // Only trigger the callback when both dates are selected
     if (newDate.from && newDate.to) {
       onDateRangeChange(newDate.from, newDate.to);
+      console.log(`DateRangeSelector: Selected date range ${format(newDate.from, 'yyyy-MM-dd')} to ${format(newDate.to, 'yyyy-MM-dd')}`);
       
       // Check if the selected range matches any preset
       const matchingPreset = presets.find(preset => {
@@ -126,7 +130,12 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
   useEffect(() => {
     const last7Days = presets.find(p => p.name === "Last 7 Days");
     if (last7Days) {
-      handlePresetChange(last7Days);
+      const range = last7Days.value();
+      setDate(range);
+      if (range.from && range.to) {
+        onDateRangeChange(range.from, range.to);
+        console.log(`DateRangeSelector: Initial range set to ${format(range.from, 'yyyy-MM-dd')} to ${format(range.to, 'yyyy-MM-dd')}`);
+      }
     }
   }, []);
 
@@ -166,7 +175,7 @@ const DateRangeSelector = ({ onDateRangeChange }: DateRangeProps) => {
                 size="sm"
                 onClick={() => handlePresetChange(preset)}
                 className={cn(
-                  "h-8 text-xs rounded transition-all font-medium",
+                  "h-8 text-xs rounded transition-all font-medium font-poppins",
                   activePreset === preset.name 
                     ? "bg-adpulse-green text-adpulse-blue-dark hover:bg-adpulse-green/90" 
                     : "text-foreground/70 hover:text-foreground border-white/20 hover:bg-white/5"

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,14 +10,48 @@ import { useNavigate } from "react-router-dom";
 import PerformanceChart from "@/components/charts/PerformanceChart";
 import EmptyState from "@/components/EmptyState";
 import PerformanceTable from "@/components/dashboard/PerformanceTable";
+import DateRangeSelector from "@/components/DateRangeSelector";
+import { format } from "date-fns";
 
 const Analytics = () => {
   const { currentUser } = useAuth();
   const [adData, setAdData] = useState<any[]>([]);
+  const [filteredData, setFilteredData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("campaigns");
   const [hasData, setHasData] = useState(false);
+  const [dateRange, setDateRange] = useState<{start?: Date, end?: Date}>({});
   const navigate = useNavigate();
+  
+  const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
+    if (!startDate || !endDate) return;
+    
+    console.log(`Analytics: Filtering by date range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
+    
+    setDateRange({ start: startDate, end: endDate });
+    
+    // Convert dates to string format for filtering
+    const formatDateToString = (date: Date) => {
+      return format(date, 'yyyy-MM-dd');
+    };
+    
+    const startDateStr = formatDateToString(startDate);
+    const endDateStr = formatDateToString(endDate);
+    
+    // Filter data based on date range
+    if (adData.length > 0) {
+      const filtered = adData.filter((item: any) => {
+        return item.date >= startDateStr && item.date <= endDateStr;
+      });
+      
+      console.log(`Analytics: Filtered data from ${adData.length} to ${filtered.length} items`);
+      setFilteredData(filtered);
+      
+      if (filtered.length === 0) {
+        toast.warning("No data available for the selected date range");
+      }
+    }
+  };
   
   useEffect(() => {
     const fetchData = async () => {
@@ -26,8 +59,11 @@ const Analytics = () => {
       
       try {
         setIsLoading(true);
+        console.log("Analytics: Fetching data");
         const data = await getAdData(currentUser.uid);
+        console.log(`Analytics: Fetched ${data.length} records`);
         setAdData(data);
+        setFilteredData(data);
         setHasData(data.length > 0);
       } catch (error) {
         console.error("Error fetching ad data:", error);
@@ -46,8 +82,24 @@ const Analytics = () => {
     try {
       setIsLoading(true);
       toast.info("Refreshing data...");
+      console.log("Analytics: Refreshing data");
       const data = await getAdData(currentUser.uid);
       setAdData(data);
+      
+      // Apply date filtering if a range is selected
+      if (dateRange.start && dateRange.end) {
+        const startDateStr = format(dateRange.start, 'yyyy-MM-dd');
+        const endDateStr = format(dateRange.end, 'yyyy-MM-dd');
+        
+        const filtered = data.filter((item: any) => {
+          return item.date >= startDateStr && item.date <= endDateStr;
+        });
+        
+        setFilteredData(filtered);
+      } else {
+        setFilteredData(data);
+      }
+      
       setHasData(data.length > 0);
       toast.success("Data refreshed successfully");
     } catch (error) {
@@ -55,6 +107,49 @@ const Analytics = () => {
       toast.error("Failed to refresh data");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!currentUser || filteredData.length === 0) return;
+    
+    try {
+      toast.info("Preparing export...");
+      
+      // Format current date for filename
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      const filename = `adpulse_analytics_${currentDate}.csv`;
+      
+      // Convert to CSV and download
+      const headers = Object.keys(filteredData[0]).filter(key => key !== "userId");
+      const csvRows = [headers.join(',')];
+      
+      filteredData.forEach((item) => {
+        const values = headers.map(header => {
+          const value = item[header];
+          return typeof value === 'string' && value.includes(',') 
+            ? `"${value.replace(/"/g, '""')}"` 
+            : String(value);
+        });
+        csvRows.push(values.join(','));
+      });
+      
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Export complete");
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast.error("Failed to export data");
     }
   };
   
@@ -77,13 +172,15 @@ const Analytics = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Advanced Analytics</h2>
-          <p className="text-white/60 mt-1">
+          <h2 className="text-xl font-semibold font-poppins">Advanced Analytics</h2>
+          <p className="text-white/60 mt-1 font-poppins">
             Detailed analysis of your advertising performance
           </p>
         </div>
         
         <div className="flex items-center gap-2">
+          <DateRangeSelector onDateRangeChange={handleDateRangeChange} />
+          
           <Button 
             variant="outline" 
             size="sm"
@@ -99,18 +196,11 @@ const Analytics = () => {
             variant="outline" 
             size="sm"
             className="bg-transparent border-white/20 hover:bg-white/5 text-white"
+            onClick={handleExport}
+            disabled={filteredData.length === 0}
           >
-            <Calendar className="h-4 w-4 mr-2" />
-            Date Range
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="bg-transparent border-white/20 hover:bg-white/5 text-white"
-          >
-            <FilterX className="h-4 w-4 mr-2" />
-            Filters
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </Button>
         </div>
       </div>
@@ -122,24 +212,24 @@ const Analytics = () => {
         className="w-full"
       >
         <TabsList className="bg-[#021627]/50 mb-4">
-          <TabsTrigger value="campaigns">Campaign Analysis</TabsTrigger>
-          <TabsTrigger value="adsets">Ad Set Analysis</TabsTrigger>
-          <TabsTrigger value="conversion">Conversion Analysis</TabsTrigger>
-          <TabsTrigger value="audience">Audience Insights</TabsTrigger>
+          <TabsTrigger value="campaigns" className="font-poppins">Campaign Analysis</TabsTrigger>
+          <TabsTrigger value="adsets" className="font-poppins">Ad Set Analysis</TabsTrigger>
+          <TabsTrigger value="conversion" className="font-poppins">Conversion Analysis</TabsTrigger>
+          <TabsTrigger value="audience" className="font-poppins">Audience Insights</TabsTrigger>
         </TabsList>
         
         <TabsContent value="campaigns" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Campaign ROAS</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Campaign ROAS</CardTitle>
                 <CardDescription>Return on ad spend by campaign</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="campaign"
                     height={300}
                     isLoading={isLoading}
@@ -150,14 +240,14 @@ const Analytics = () => {
             
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Campaign CTR</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Campaign CTR</CardTitle>
                 <CardDescription>Click-through rate by campaign</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="ctr"
                     height={300}
                     isLoading={isLoading}
@@ -169,34 +259,27 @@ const Analytics = () => {
           
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle className="text-lg font-medium">Campaign Performance</CardTitle>
+              <CardTitle className="text-lg font-medium font-poppins">Campaign Performance</CardTitle>
               <CardDescription>Detailed breakdown of campaign metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <PerformanceTable data={adData} isLoading={isLoading} />
+              <PerformanceTable data={filteredData} isLoading={isLoading} />
             </CardContent>
           </Card>
-          
-          <div className="mt-6 flex justify-end">
-            <Button variant="outline" className="bg-transparent border-white/20 hover:bg-white/5">
-              <Download className="h-4 w-4 mr-2" />
-              Export Campaign Data
-            </Button>
-          </div>
         </TabsContent>
         
         <TabsContent value="adsets" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Ad Set Performance</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Ad Set Performance</CardTitle>
                 <CardDescription>Spend vs. results by ad set</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="campaign"
                     height={300}
                     isLoading={isLoading}
@@ -207,14 +290,14 @@ const Analytics = () => {
             
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Ad Set CTR</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Ad Set CTR</CardTitle>
                 <CardDescription>Click-through rate by ad set</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="ctr"
                     height={300}
                     isLoading={isLoading}
@@ -226,11 +309,11 @@ const Analytics = () => {
           
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle className="text-lg font-medium">Ad Set Breakdown</CardTitle>
+              <CardTitle className="text-lg font-medium font-poppins">Ad Set Breakdown</CardTitle>
               <CardDescription>Detailed performance metrics by ad set</CardDescription>
             </CardHeader>
             <CardContent>
-              <PerformanceTable data={adData} isLoading={isLoading} />
+              <PerformanceTable data={filteredData} isLoading={isLoading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -239,14 +322,14 @@ const Analytics = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Conversion Rate</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Conversion Rate</CardTitle>
                 <CardDescription>Conversion rate over time</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="cvr"
                     height={300}
                     isLoading={isLoading}
@@ -257,14 +340,14 @@ const Analytics = () => {
             
             <Card className="bg-[#0B2537] border-white/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Cost Per Acquisition</CardTitle>
+                <CardTitle className="text-lg font-medium font-poppins">Cost Per Acquisition</CardTitle>
                 <CardDescription>CPA trends over time</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[300px]">
                   <PerformanceChart
                     title=""
-                    data={adData}
+                    data={filteredData}
                     type="cpcVsCpa"
                     height={300}
                     isLoading={isLoading}
@@ -276,7 +359,7 @@ const Analytics = () => {
           
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle className="text-lg font-medium">Conversion Path Analysis</CardTitle>
+              <CardTitle className="text-lg font-medium font-poppins">Conversion Path Analysis</CardTitle>
               <CardDescription>How users convert across your funnel</CardDescription>
             </CardHeader>
             <CardContent className="p-10 text-center">
@@ -293,7 +376,7 @@ const Analytics = () => {
         <TabsContent value="audience" className="mt-0">
           <Card className="bg-[#0B2537] border-white/10">
             <CardHeader>
-              <CardTitle className="text-lg font-medium">Audience Insights</CardTitle>
+              <CardTitle className="text-lg font-medium font-poppins">Audience Insights</CardTitle>
               <CardDescription>Understand your audience demographics and behavior</CardDescription>
             </CardHeader>
             <CardContent className="py-10 text-center">
