@@ -284,6 +284,9 @@ export const parseCSVData = (csvData: string, customColumnMapping: Record<string
         continue;
       }
       
+      // Standardize the date format - ensure YYYY-MM-DD
+      adData.date = standardizeDate(adData.date);
+      
       result.push(adData);
     } catch (error) {
       console.error(`Error parsing row ${i}:`, error);
@@ -309,6 +312,57 @@ const getValueByHeader = (headerName: string, values: string[], headerIndexMap: 
   return values[index] || "";
 };
 
+// Standardize date format to YYYY-MM-DD
+const standardizeDate = (dateString: string): string => {
+  if (!dateString) return "";
+  
+  // If already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+  
+  // Try to parse various date formats
+  try {
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      // Format as YYYY-MM-DD
+      return date.toISOString().split('T')[0];
+    }
+    
+    // Try parsing MM/DD/YYYY format
+    const parts = dateString.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      // Assuming MM/DD/YYYY or DD/MM/YYYY
+      let year, month, day;
+      
+      // Check if first part is likely a month (1-12) or day (1-31)
+      if (parseInt(parts[0]) <= 12) {
+        // Likely MM/DD/YYYY format
+        month = parseInt(parts[0]);
+        day = parseInt(parts[1]);
+        year = parseInt(parts[2]);
+      } else {
+        // Likely DD/MM/YYYY format
+        day = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+        year = parseInt(parts[2]);
+      }
+      
+      // Add century if needed
+      if (year < 100) {
+        year += year < 50 ? 2000 : 1900;
+      }
+      
+      // Format as YYYY-MM-DD
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  } catch (error) {
+    console.error("Error parsing date:", dateString, error);
+  }
+  
+  return dateString; // Return original if can't parse
+};
+
 // Validate individual data row
 const validateDataRow = (data: AdData): boolean => {
   // Make validation less strict to handle more data formats
@@ -318,27 +372,15 @@ const validateDataRow = (data: AdData): boolean => {
   }
   
   // Check date format (YYYY-MM-DD) or any other common date format
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!dateRegex.test(data.date)) {
-    // Try to parse as a date and format it
-    try {
-      const parsedDate = new Date(data.date);
-      if (!isNaN(parsedDate.getTime())) {
-        // It's a valid date, but not in the expected format
-        // Let's standardize the date format to YYYY-MM-DD
-        const year = parsedDate.getFullYear();
-        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(parsedDate.getDate()).padStart(2, '0');
-        data.date = `${year}-${month}-${day}`;
-        return true;
-      }
-      return false;
-    } catch {
+  try {
+    const parsedDate = new Date(data.date);
+    if (isNaN(parsedDate.getTime())) {
       return false;
     }
+    return true;
+  } catch {
+    return false;
   }
-  
-  return true;
 };
 
 // Save ad data to Firestore and record the upload
@@ -351,6 +393,12 @@ export const saveAdData = async (
   try {
     console.log(`Starting saveAdData: ${data.length} records, overwrite=${overwrite}`);
     
+    // Get the min and max dates from the data
+    const minDate = data.reduce((min, item) => (!min || item.date < min) ? item.date : min, "");
+    const maxDate = data.reduce((max, item) => (!max || item.date > max) ? item.date : max, "");
+    
+    console.log(`Data date range: ${minDate} to ${maxDate}`);
+    
     // Start by creating an upload record
     const uploadRecord = {
       userId,
@@ -359,8 +407,8 @@ export const saveAdData = async (
       recordCount: data.length,
       status: 'processing' as const,
       dateRange: {
-        start: data.reduce((min, item) => !min || item.date < min ? item.date : min, ""),
-        end: data.reduce((max, item) => !max || item.date > max ? item.date : max, ""),
+        start: minDate,
+        end: maxDate,
       }
     };
     
@@ -373,7 +421,7 @@ export const saveAdData = async (
     let skippedCount = 0;
     
     // Batch process records for efficiency
-    const batchSize = 100;
+    const batchSize = 20; // Smaller batch size for better progress reporting
     const batches = [];
     
     for (let i = 0; i < data.length; i += batchSize) {
@@ -381,44 +429,57 @@ export const saveAdData = async (
       batches.push(batch);
     }
     
-    for (const batch of batches) {
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      
       for (const item of batch) {
         item.userId = userId;
         item.uploadId = uploadRef.id; // Reference to the upload record
         
-        const existingQuery = query(
-          collection(db, "adData"),
-          where("userId", "==", userId),
-          where("date", "==", item.date),
-          where("campaignName", "==", item.campaignName),
-          where("adSetName", "==", item.adSetName)
-        );
-        
-        const existingDocs = await getDocs(existingQuery);
-        
-        if (!existingDocs.empty) {
-          // Data already exists
-          if (overwrite) {
-            // Update existing document
-            const docId = existingDocs.docs[0].id;
-            await updateDoc(doc(db, "adData", docId), { 
+        try {
+          const existingQuery = query(
+            collection(db, "adData"),
+            where("userId", "==", userId),
+            where("date", "==", item.date),
+            where("campaignName", "==", item.campaignName),
+            where("adSetName", "==", item.adSetName)
+          );
+          
+          const existingDocs = await getDocs(existingQuery);
+          
+          if (!existingDocs.empty) {
+            // Data already exists
+            if (overwrite) {
+              // Update existing document
+              const docId = existingDocs.docs[0].id;
+              await updateDoc(doc(db, "adData", docId), { 
+                ...item,
+                updatedAt: Date.now()
+              });
+              savedCount++;
+            } else {
+              // Skip this item
+              skippedCount++;
+            }
+          } else {
+            // Add new document
+            await addDoc(collection(db, "adData"), {
               ...item,
-              updatedAt: Date.now()
+              createdAt: Date.now()
             });
             savedCount++;
-          } else {
-            // Skip this item
-            skippedCount++;
           }
-        } else {
-          // Add new document
-          await addDoc(collection(db, "adData"), {
-            ...item,
-            createdAt: Date.now()
-          });
-          savedCount++;
+        } catch (error) {
+          console.error(`Error saving record for ${item.date}, ${item.campaignName}:`, error);
         }
       }
+      
+      // Update progress at the end of each batch
+      await updateDoc(doc(db, "uploads", uploadRef.id), {
+        status: 'processing',
+        recordCount: savedCount,
+        progress: Math.round((i + 1) * 100 / batches.length)
+      });
     }
     
     console.log(`Completed processing: Saved ${savedCount}, Skipped ${skippedCount}`);
@@ -669,37 +730,48 @@ export const generateCSVTemplate = (): string => {
 export const getAdData = async (userId: string, startDate?: string, endDate?: string, campaignName?: string, adSetName?: string) => {
   try {
     console.log(`Getting ad data for user: ${userId}, date range: ${startDate || 'none'} to ${endDate || 'none'}`);
+    
+    // If we have a date range, make sure they are standardized
+    let standardizedStartDate = startDate ? standardizeDate(startDate) : undefined;
+    let standardizedEndDate = endDate ? standardizeDate(endDate) : undefined;
+    
+    console.log(`Standardized date range: ${standardizedStartDate || 'none'} to ${standardizedEndDate || 'none'}`);
+    
     let q = query(
       collection(db, "adData"),
       where("userId", "==", userId)
     );
     
-    // Add date range filter if provided
-    if (startDate && endDate) {
-      console.log(`Filtering by date range: ${startDate} to ${endDate}`);
-      q = query(q, where("date", ">=", startDate), where("date", "<=", endDate));
-    }
-    
-    // Apply additional filters if provided
-    if (campaignName) {
-      q = query(q, where("campaignName", "==", campaignName));
-    }
-    
-    if (adSetName) {
-      q = query(q, where("adSetName", "==", adSetName));
+    // Build a query based on available filters
+    if (standardizedStartDate && standardizedEndDate) {
+      console.log(`Filtering by date range: ${standardizedStartDate} to ${standardizedEndDate}`);
+      
+      // Firebase doesn't support multiple range conditions in the same query
+      // So we'll first get by date range, then filter the rest in memory
+      q = query(
+        q,
+        where("date", ">=", standardizedStartDate),
+        where("date", "<=", standardizedEndDate)
+      );
     }
     
     console.log("Executing query...");
     const querySnapshot = await getDocs(q);
     console.log(`Query returned ${querySnapshot.size} documents`);
     
-    const data: AdData[] = [];
-    querySnapshot.forEach((doc) => {
-      data.push(doc.data() as AdData);
-    });
+    // Get the base data
+    let data = querySnapshot.docs.map(doc => doc.data() as AdData);
     
-    // Debug log to see what data was retrieved
-    console.log(`Processed ${data.length} records with data:`, data.length > 0 ? data[0] : "No data");
+    // Apply additional filters in memory if needed
+    if (campaignName) {
+      data = data.filter(item => item.campaignName === campaignName);
+    }
+    
+    if (adSetName) {
+      data = data.filter(item => item.adSetName === adSetName);
+    }
+    
+    console.log(`Filtered to ${data.length} records with data:`, data.length > 0 ? data[0] : "No data");
     
     return data;
   } catch (error) {

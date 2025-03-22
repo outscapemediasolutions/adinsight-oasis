@@ -1,10 +1,11 @@
+
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData, csvHeaders, columnMappings } from "@/services/data";
@@ -13,8 +14,10 @@ import { Upload, Download, AlertTriangle, X, Check, FileText, Map } from "lucide
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import UploadHistory from "@/components/UploadHistory";
 
 const CSVUpload = () => {
+  const [activeTab, setActiveTab] = useState("upload");
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -64,6 +67,18 @@ const CSVUpload = () => {
           const headers = lines[0].split(',').map(header => header.trim());
           setDetectedHeaders(headers);
           console.log("Detected headers:", headers);
+          
+          // Pre-map CPM columns if they are split
+          const hasCPMPart1 = headers.some(h => h.includes("CPM (cost per 1"));
+          const hasCPMPart2 = headers.some(h => h.includes("000 impressions)"));
+          
+          if (hasCPMPart1 && hasCPMPart2) {
+            setCustomColumnMapping(prev => ({
+              ...prev,
+              "CPM (cost per 1": "CPM (cost per 1,000 impressions)",
+              "000 impressions)": "CPM (cost per 1,000 impressions)"
+            }));
+          }
         }
       } catch (error) {
         console.error("Error extracting headers:", error);
@@ -203,7 +218,9 @@ const CSVUpload = () => {
       setUploadProgress(40);
       setUploadStep("Uploading to database...");
       
-      await saveAdData(parsedData, currentUser.uid, overwrite, file?.name || "upload.csv");
+      const result = await saveAdData(parsedData, currentUser.uid, overwrite, file?.name || "upload.csv");
+      
+      console.log("Upload result:", result);
       
       // Step 3: Finalizing
       setUploadProgress(80);
@@ -221,7 +238,9 @@ const CSVUpload = () => {
         setDialogOpen(false);
         setShowUploadingScreen(false);
         toast.success("Data uploaded successfully!");
-        navigate("/");
+        
+        // Switch to history tab
+        setActiveTab("history");
       }, 1000);
       
     } catch (error) {
@@ -261,9 +280,9 @@ const CSVUpload = () => {
     }
   };
 
-  // Handle redirection to advanced upload page
-  const goToAdvancedUpload = () => {
-    navigate("/upload");
+  // Handle navigation to dashboard
+  const goToDashboard = () => {
+    navigate("/");
   };
 
   // Display column format in a more readable way
@@ -302,32 +321,46 @@ const CSVUpload = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card className="glass-card">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center text-xl font-semibold font-poppins">
-            <FileText className="mr-2 h-5 w-5 text-adpulse-green" />
-            Upload Meta Ads Data
-          </CardTitle>
-          <CardDescription className="font-poppins">
-            Upload your Meta Ads CSV data for analysis and tracking.
-            <Button 
-              variant="link" 
-              onClick={goToAdvancedUpload} 
-              className="text-adpulse-green px-0 hover:no-underline font-poppins"
-            >
-              Use advanced upload features
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upload" className="font-poppins">Upload CSV</TabsTrigger>
-              <TabsTrigger value="template" className="font-poppins">Format Requirements</TabsTrigger>
-            </TabsList>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold font-poppins">Upload Meta Ads Data</h1>
+        <div className="flex gap-4">
+          <Button
+            variant="outline"
+            onClick={downloadTemplate}
+            className="font-poppins"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Download CSV Template
+          </Button>
+          <Button
+            onClick={goToDashboard}
+            className="font-poppins"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Go to Dashboard & Refresh Data
+          </Button>
+        </div>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-2 w-full mb-6">
+          <TabsTrigger value="upload" className="font-poppins">Upload CSV</TabsTrigger>
+          <TabsTrigger value="history" className="font-poppins">Upload History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="upload">
+          <Card className="glass-card">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center text-xl font-semibold font-poppins">
+                <FileText className="mr-2 h-5 w-5 text-adpulse-green" />
+                Upload Meta Ads Data
+              </CardTitle>
+              <CardDescription className="font-poppins">
+                Upload your Meta Ads CSV data for analysis and tracking.
+              </CardDescription>
+            </CardHeader>
             
-            <TabsContent value="upload" className="pt-4">
+            <CardContent>
               <div className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="csv-file" className="font-poppins">Select CSV File</Label>
@@ -377,18 +410,11 @@ const CSVUpload = () => {
                     </AlertDescription>
                   </Alert>
                 )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="template" className="pt-4">
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground font-poppins">
-                  Your CSV file must include the following columns:
-                </p>
                 
-                <div className="bg-card border rounded-md p-4 overflow-auto max-h-[400px]">
-                  <div className="grid grid-cols-1 gap-2">
-                    {csvHeaders.map((header, index) => (
+                <div className="bg-card border border-white/10 rounded-md p-4">
+                  <h3 className="text-sm font-medium mb-2 font-poppins">Required Columns</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {csvHeaders.slice(0, 8).map((header, index) => (
                       <div 
                         key={index} 
                         className="text-xs py-1 px-2 border border-white/10 rounded bg-muted/50 font-poppins"
@@ -396,41 +422,40 @@ const CSVUpload = () => {
                         {header}
                       </div>
                     ))}
+                    <div className="text-xs py-1 px-2 border border-white/10 rounded bg-muted/50 font-poppins">
+                      ... and others
+                    </div>
                   </div>
                 </div>
-                
-                <Button 
-                  onClick={downloadTemplate}
-                  className="w-full font-poppins"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Template
-                </Button>
               </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
+            </CardContent>
+            
+            <CardFooter className="pt-0">
+              <Button
+                onClick={parseCSV}
+                disabled={!file || isUploading}
+                className="w-full font-poppins"
+              >
+                {isValidating ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spinner rounded-full border-2 border-adpulse-green border-r-transparent" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Data
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
         
-        <CardFooter className="pt-0">
-          <Button
-            onClick={parseCSV}
-            disabled={!file || isUploading}
-            className="w-full font-poppins"
-          >
-            {isUploading ? (
-              <>
-                <div className="mr-2 h-4 w-4 animate-spinner rounded-full border-2 border-adpulse-green border-r-transparent" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Data
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
+        <TabsContent value="history">
+          <UploadHistory />
+        </TabsContent>
+      </Tabs>
       
       {/* Column Mapping Dialog */}
       <Dialog open={mappingDialogOpen} onOpenChange={setMappingDialogOpen}>
