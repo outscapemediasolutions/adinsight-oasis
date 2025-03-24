@@ -506,7 +506,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Campaigns" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Campaigns</SelectItem>
+                <SelectItem value="_all">All Campaigns</SelectItem>
                 {campaigns.map((campaign) => (
                   <SelectItem key={campaign} value={campaign}>
                     {campaign}
@@ -521,7 +521,7 @@ const Dashboard = () => {
                   <SelectValue placeholder="All Ad Sets" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Ad Sets</SelectItem>
+                  <SelectItem value="_all">All Ad Sets</SelectItem>
                   {adSets.map((adSet) => (
                     <SelectItem key={adSet} value={adSet}>
                       {adSet}
