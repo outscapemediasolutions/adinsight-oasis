@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, ComposedChart, Area, ReferenceLine, AreaChart
 } from "recharts";
 import { AdData, getDataByDate, calculateMetrics } from "@/services/data";

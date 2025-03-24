@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -247,6 +246,7 @@ const Dashboard = () => {
         const endDateParam = searchParams.get('endDate');
         const campaignParam = searchParams.get('campaign');
         const adSetParam = searchParams.get('adSet');
+        const uploadIdParam = searchParams.get('uploadId');
         
         let filters: any = {};
         
@@ -263,6 +263,10 @@ const Dashboard = () => {
         if (adSetParam) {
           filters.adSetName = adSetParam;
           setSelectedAdSet(adSetParam);
+        }
+
+        if (uploadIdParam) {
+          filters.uploadId = uploadIdParam;
         }
         
         const data = await getAdData(currentUser.uid, filters);
@@ -304,7 +308,7 @@ const Dashboard = () => {
     };
     
     fetchData();
-  }, [currentUser]);
+  }, [currentUser, searchParams]);
   
   const handleRefresh = async () => {
     if (!currentUser) return;
@@ -327,6 +331,11 @@ const Dashboard = () => {
       
       if (selectedAdSet) {
         filters.adSetName = selectedAdSet;
+      }
+
+      const uploadIdParam = searchParams.get('uploadId');
+      if (uploadIdParam) {
+        filters.uploadId = uploadIdParam;
       }
       
       const data = await getAdData(currentUser.uid, filters);
@@ -439,8 +448,8 @@ const Dashboard = () => {
           
           <DateRangeSelector 
             onDateRangeChange={handleDateRangeChange} 
-            initialStartDate={dateRange.start}
-            initialEndDate={dateRange.end}
+            startDate={dateRange.start}
+            endDate={dateRange.end}
           />
           
           <Button 

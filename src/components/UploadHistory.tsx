@@ -103,7 +103,7 @@ const UploadHistory = () => {
   const viewInDashboard = (upload: UploadRecord) => {
     if (upload.dateRange?.start && upload.dateRange?.end) {
       // Navigate to dashboard with the date range
-      navigate(`/?startDate=${upload.dateRange.start}&endDate=${upload.dateRange.end}`);
+      navigate(`/?startDate=${upload.dateRange.start}&endDate=${upload.dateRange.end}&uploadId=${upload.id}`);
     } else {
       toast.warning("No date range available for this upload");
     }
@@ -131,7 +131,7 @@ const UploadHistory = () => {
   const StatusBadge = ({ status }: { status: string }) => {
     const color = status === 'completed' ? 'success' : status === 'failed' ? 'destructive' : 'warning';
     return (
-      <span className={`text-xs px-2 py-1 rounded-full bg-${color === 'success' ? 'adpulse-green/20' : color === 'destructive' ? 'red-500/20' : 'yellow-500/20'} text-${color === 'success' ? 'adpulse-green' : color === 'destructive' ? 'red-500' : 'yellow-500'}`}>
+      <span className={`text-xs px-2 py-1 rounded-full ${color === 'success' ? 'bg-adpulse-green/20 text-adpulse-green' : color === 'destructive' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
         {status}
       </span>
     );
