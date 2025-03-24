@@ -34,7 +34,11 @@ import {
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 
-const UploadHistory = () => {
+interface UploadHistoryProps {
+  refreshTrigger?: number; // This will be used to trigger a refresh
+}
+
+const UploadHistory: React.FC<UploadHistoryProps> = ({ refreshTrigger }) => {
   const [uploads, setUploads] = useState<UploadRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
@@ -59,10 +63,10 @@ const UploadHistory = () => {
     }
   };
   
-  // Initialize data
+  // Initialize data and handle refresh trigger
   useEffect(() => {
     fetchUploadHistory();
-  }, [currentUser]);
+  }, [currentUser, refreshTrigger]); // Add refreshTrigger as a dependency
   
   // Handle download
   const handleDownload = async (uploadId: string, format: "csv" | "json" = "csv") => {

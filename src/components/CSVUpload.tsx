@@ -14,12 +14,14 @@ interface CSVUploadProps {
   onUploadStart?: () => void;
   onUploadComplete?: (success: boolean, filename?: string, dateRange?: { start: string; end: string }) => void;
   onValidate?: (csvData: string) => boolean;
+  onUploadSuccess?: () => void; // New callback for explicit refresh trigger
 }
 
 const CSVUpload: React.FC<CSVUploadProps> = ({ 
   onUploadStart, 
   onUploadComplete,
-  onValidate 
+  onValidate,
+  onUploadSuccess
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -157,6 +159,7 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
           clearInterval(progressInterval);
           setUploadProgress(100);
           
+          // Use a slight delay for better UX
           setTimeout(() => {
             if (onUploadComplete) {
               onUploadComplete(
@@ -165,6 +168,12 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
                 { start: minDate, end: maxDate }
               );
             }
+            
+            // Call onUploadSuccess callback to trigger history refresh
+            if (onUploadSuccess) {
+              onUploadSuccess();
+            }
+            
             resetUpload();
             toast.success("CSV data uploaded successfully");
           }, 500);

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +41,7 @@ const Upload = () => {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [uploadDateRange, setUploadDateRange] = useState<{ start: string; end: string } | null>(null);
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0); // New state to trigger refreshes
   
   const navigate = useNavigate();
   
@@ -64,6 +66,13 @@ const Upload = () => {
     setUploadSuccess(success);
     setUploadFilename(filename || null);
     setUploadDateRange(dateRange || null);
+  };
+
+  // Create a new handler for upload success
+  const handleUploadSuccess = () => {
+    console.log("Upload successful, refreshing history...");
+    // Increment the trigger to cause a refresh in the UploadHistory component
+    setRefreshHistoryTrigger(prev => prev + 1);
   };
   
   const handleCSVValidation = (csvData: string) => {
@@ -103,6 +112,7 @@ const Upload = () => {
                 onUploadStart={handleUploadStart}
                 onUploadComplete={handleUploadComplete}
                 onValidate={handleCSVValidation}
+                onUploadSuccess={handleUploadSuccess} // Add new callback
               />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
@@ -240,7 +250,7 @@ const Upload = () => {
         </TabsContent>
         
         <TabsContent value="history" className="space-y-4">
-          <UploadHistory />
+          <UploadHistory refreshTrigger={refreshHistoryTrigger} />
         </TabsContent>
       </Tabs>
     </div>
