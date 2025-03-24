@@ -15,14 +15,14 @@ interface StatCardProps {
 const StatCard = ({ title, value, description, icon, trend, percentage }: StatCardProps) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <CardTitle className="text-sm font-medium font-poppins">{title}</CardTitle>
       <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
         {icon}
       </div>
     </CardHeader>
     <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
-      <p className="text-xs text-muted-foreground">{description}</p>
+      <div className="text-2xl font-bold font-poppins">{value}</div>
+      <p className="text-xs text-muted-foreground font-poppins">{description}</p>
       {trend && percentage && (
         <div className="flex items-center pt-1">
           {trend === "up" ? (
@@ -30,7 +30,7 @@ const StatCard = ({ title, value, description, icon, trend, percentage }: StatCa
           ) : trend === "down" ? (
             <ArrowDownIcon className="h-3 w-3 text-adpulse-red mr-1" />
           ) : null}
-          <span className={`text-xs ${trend === "up" ? "text-adpulse-green" : trend === "down" ? "text-adpulse-red" : ""}`}>
+          <span className={`text-xs font-poppins ${trend === "up" ? "text-adpulse-green" : trend === "down" ? "text-adpulse-red" : ""}`}>
             {percentage}
           </span>
         </div>
@@ -78,28 +78,28 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
-        title="Total Revenue"
-        value={`₹${placeholderData.totalSales.toLocaleString()}`}
-        description="Total revenue from all campaigns"
+        title="Revenue"
+        value={`₹${placeholderData.totalSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+        description="Purchase conversion value from ads"
         icon={<DollarSign className="h-4 w-4" />}
         trend="up"
-        percentage="12% from last month"
+        percentage="12% from last period"
       />
       <StatCard
         title="Orders"
         value={placeholderData.totalOrders.toLocaleString()}
-        description="Total orders from all campaigns"
+        description="Total sales attributed to ads"
         icon={<ShoppingCart className="h-4 w-4" />}
         trend="up"
-        percentage="7% from last month"
+        percentage="7% from last period"
       />
       <StatCard
-        title="Total Visitors"
+        title="Link Clicks"
         value={placeholderData.totalVisitors.toLocaleString()}
-        description="Unique visitors from all campaigns"
+        description="Total clicks from all campaigns"
         icon={<Users className="h-4 w-4" />}
         trend="down"
-        percentage="3% from last month"
+        percentage="3% from last period"
       />
       <StatCard
         title="ROAS"

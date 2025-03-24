@@ -3,8 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-  Legend, ResponsiveContainer, ComposedChart, Area, Scatter, ScatterChart, 
-  Cell, PieChart, Pie, ReferenceLine, AreaChart
+  Legend, ResponsiveContainer, ComposedChart, Area, ReferenceLine, AreaChart
 } from "recharts";
 import { AdData, getDataByDate, calculateMetrics } from "@/services/data";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,44 +71,146 @@ const PerformanceChart = ({
     
     switch (type) {
       case "spendVsRevenue": {
-        const dataByDate = getDataByDate(data);
-        const processedData = dataByDate.map(item => ({
-          date: item.date,
-          spend: item.metrics.totalSpend,
-          revenue: item.metrics.totalSales,
-          profit: item.metrics.totalSales - item.metrics.totalSpend,
-        }));
+        // Group by date
+        const dateMap = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!dateMap.has(item.date)) {
+            dateMap.set(item.date, []);
+          }
+          dateMap.get(item.date)?.push(item);
+        });
+        
+        // Calculate metrics for each date
+        const processedData = Array.from(dateMap.entries())
+          .map(([date, items]) => {
+            // Sum up values for the date
+            const spend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const revenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            
+            return {
+              date,
+              spend,
+              revenue,
+              profit: revenue - spend
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
+        
         setChartData(processedData);
         break;
       }
       case "roas": {
-        const dataByDate = getDataByDate(data);
-        const processedData = dataByDate.map(item => ({
-          date: item.date,
-          roas: item.metrics.roas,
-          target: 3.0, // Target ROAS line
-        }));
+        // Group by date
+        const dateMap = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!dateMap.has(item.date)) {
+            dateMap.set(item.date, []);
+          }
+          dateMap.get(item.date)?.push(item);
+        });
+        
+        // Calculate ROAS for each date
+        const processedData = Array.from(dateMap.entries())
+          .map(([date, items]) => {
+            // Get weighted average ROAS based on spend
+            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            
+            if (totalSpend === 0) return { date, roas: 0, target: 3.0 };
+            
+            const weightedRoas = items.reduce((sum, item) => {
+              const spend = item.spend || 0;
+              const weight = totalSpend > 0 ? spend / totalSpend : 0;
+              return sum + ((item.purchaseRoas || 0) * weight);
+            }, 0);
+            
+            return {
+              date,
+              roas: weightedRoas,
+              target: 3.0 // Target ROAS line
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
+        
         setChartData(processedData);
         break;
       }
       case "cpcVsCpa": {
-        const dataByDate = getDataByDate(data);
-        const processedData = dataByDate.map(item => ({
-          date: item.date,
-          cpc: item.metrics.cpc,
-          cpa: item.metrics.costPerResult,
-        }));
+        // Group by date
+        const dateMap = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!dateMap.has(item.date)) {
+            dateMap.set(item.date, []);
+          }
+          dateMap.get(item.date)?.push(item);
+        });
+        
+        // Calculate metrics for each date
+        const processedData = Array.from(dateMap.entries())
+          .map(([date, items]) => {
+            // Get weighted average CPC and CPA based on spend
+            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            
+            if (totalSpend === 0) return { date, cpc: 0, cpa: 0 };
+            
+            const weightedCpc = items.reduce((sum, item) => {
+              const spend = item.spend || 0;
+              const weight = totalSpend > 0 ? spend / totalSpend : 0;
+              return sum + ((item.cpc || 0) * weight);
+            }, 0);
+            
+            const weightedCpa = items.reduce((sum, item) => {
+              const spend = item.spend || 0;
+              const weight = totalSpend > 0 ? spend / totalSpend : 0;
+              return sum + ((item.costPerResult || 0) * weight);
+            }, 0);
+            
+            return {
+              date,
+              cpc: weightedCpc,
+              cpa: weightedCpa
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
+        
         setChartData(processedData);
         break;
       }
       case "ordersVsVisitors": {
-        const dataByDate = getDataByDate(data);
-        const processedData = dataByDate.map(item => ({
-          date: item.date,
-          orders: item.metrics.totalOrders,
-          visitors: item.metrics.totalVisitors,
-          conversionRate: item.metrics.cvr,
-        }));
+        // Group by date
+        const dateMap = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!dateMap.has(item.date)) {
+            dateMap.set(item.date, []);
+          }
+          dateMap.get(item.date)?.push(item);
+        });
+        
+        // Calculate metrics for each date
+        const processedData = Array.from(dateMap.entries())
+          .map(([date, items]) => {
+            // Sum up values for the date
+            const clicks = items.reduce((sum, item) => sum + (item.clicks || 0), 0);
+            
+            // Only count results as orders for sales campaigns
+            const orders = items.reduce((sum, item) => {
+              if (item.objective?.toLowerCase().includes('sales')) {
+                return sum + (item.results || 0);
+              }
+              return sum;
+            }, 0);
+            
+            // Calculate conversion rate
+            const conversionRate = clicks > 0 ? (orders / clicks) * 100 : 0;
+            
+            return {
+              date,
+              clicks,
+              orders,
+              conversionRate
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
+        
         setChartData(processedData);
         break;
       }
@@ -123,20 +224,33 @@ const PerformanceChart = ({
           campaigns.get(item.campaignName)?.push(item);
         });
         
-        const processedData = Array.from(campaigns.entries()).map(([campaign, items]) => {
-          const metrics = calculateMetrics(items);
-          return {
-            campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
-            ctr: metrics.ctr,
-            impressions: metrics.totalImpressions,
-          };
-        }).sort((a, b) => b.ctr - a.ctr);
+        // Calculate CTR for each campaign
+        const processedData = Array.from(campaigns.entries())
+          .map(([campaign, items]) => {
+            // Get weighted average CTR based on impressions
+            const totalImpressions = items.reduce((sum, item) => sum + (item.impressions || 0), 0);
+            
+            if (totalImpressions === 0) return { campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign, ctr: 0, impressions: 0 };
+            
+            const weightedCtr = items.reduce((sum, item) => {
+              const impressions = item.impressions || 0;
+              const weight = totalImpressions > 0 ? impressions / totalImpressions : 0;
+              return sum + ((item.ctr || 0) * weight);
+            }, 0);
+            
+            return {
+              campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
+              ctr: weightedCtr,
+              impressions: totalImpressions
+            };
+          })
+          .sort((a, b) => b.ctr - a.ctr);
         
         setChartData(processedData);
         break;
       }
       case "cvr": {
-        // Group by campaign and calculate average CVR
+        // Group by campaign and calculate conversion metrics
         const campaigns = new Map<string, AdData[]>();
         data.forEach(item => {
           if (!campaigns.has(item.campaignName)) {
@@ -145,14 +259,23 @@ const PerformanceChart = ({
           campaigns.get(item.campaignName)?.push(item);
         });
         
-        const processedData = Array.from(campaigns.entries()).map(([campaign, items]) => {
-          const metrics = calculateMetrics(items);
-          return {
-            campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
-            cvr: metrics.cvr,
-            spend: metrics.totalSpend,
-          };
-        }).sort((a, b) => b.cvr - a.cvr);
+        // Calculate conversion rate for each campaign
+        const processedData = Array.from(campaigns.entries())
+          .map(([campaign, items]) => {
+            const totalClicks = items.reduce((sum, item) => sum + (item.clicks || 0), 0);
+            const totalPurchases = items.reduce((sum, item) => sum + (item.purchases || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            
+            // Calculate conversion rate
+            const cvr = totalClicks > 0 ? (totalPurchases / totalClicks) * 100 : 0;
+            
+            return {
+              campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
+              cvr,
+              spend: totalSpend
+            };
+          })
+          .sort((a, b) => b.cvr - a.cvr);
         
         setChartData(processedData);
         break;
@@ -167,15 +290,49 @@ const PerformanceChart = ({
           campaigns.get(item.campaignName)?.push(item);
         });
         
-        const processedData = Array.from(campaigns.entries()).map(([campaign, items]) => {
-          const metrics = calculateMetrics(items);
-          return {
-            campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
-            spend: metrics.totalSpend,
-            revenue: metrics.totalSales,
-            profit: metrics.totalSales - metrics.totalSpend,
-          };
-        }).sort((a, b) => b.profit - a.profit);
+        // Calculate metrics for each campaign
+        const processedData = Array.from(campaigns.entries())
+          .map(([campaign, items]) => {
+            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const totalRevenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            
+            return {
+              campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
+              spend: totalSpend,
+              revenue: totalRevenue,
+              profit: totalRevenue - totalSpend
+            };
+          })
+          .sort((a, b) => b.profit - a.profit);
+        
+        setChartData(processedData);
+        break;
+      }
+      case "adSet": {
+        // Group by ad set for performance metrics
+        const adSets = new Map<string, AdData[]>();
+        data.forEach(item => {
+          if (!adSets.has(item.adSetName)) {
+            adSets.set(item.adSetName, []);
+          }
+          adSets.get(item.adSetName)?.push(item);
+        });
+        
+        // Calculate metrics for each ad set
+        const processedData = Array.from(adSets.entries())
+          .map(([adSet, items]) => {
+            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const totalRevenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+            
+            return {
+              adSet: adSet.length > 20 ? adSet.substring(0, 20) + "..." : adSet,
+              spend: totalSpend,
+              revenue: totalRevenue,
+              roas
+            };
+          })
+          .sort((a, b) => b.roas - a.roas);
         
         setChartData(processedData);
         break;
@@ -209,9 +366,9 @@ const PerformanceChart = ({
                   <stop offset="0%" stopColor="#6fe394" stopOpacity={0.8} />
                   <stop offset="100%" stopColor="#6fe394" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient id={blueGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#64b5f6" stopOpacity={0.8} />
-                  <stop offset="100%" stopColor="#64b5f6" stopOpacity={0} />
+                <linearGradient id={orangeGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ff9800" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#ff9800" stopOpacity={0} />
                 </linearGradient>
               </defs>
             </svg>
@@ -229,7 +386,6 @@ const PerformanceChart = ({
                 <Legend />
                 <Area type="monotone" dataKey="spend" name="Ad Spend" stroke="#ff9800" fill={`url(#${orangeGradientId})`} />
                 <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#6fe394" fill={`url(#${greenGradientId})`} />
-                <ReferenceLine y={0} stroke="#e0f2f1" strokeDasharray="3 3" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -286,12 +442,12 @@ const PerformanceChart = ({
                 <Tooltip 
                   content={<CustomTooltip />}
                   formatter={(value: number, name: string) => {
-                    return [value, name === "cpc" ? "Cost per Click" : "Cost per Acquisition", "₹"];
+                    return [value, name === "cpc" ? "Cost per Click" : "Cost per Result", "₹"];
                   }}
                 />
                 <Legend />
                 <Area type="monotone" dataKey="cpc" name="Cost per Click" stroke="#64b5f6" fill={`url(#${blueGradientId})`} strokeWidth={2} />
-                <Area type="monotone" dataKey="cpa" name="Cost per Acquisition" stroke="#ff9800" fill={`url(#${orangeGradientId})`} strokeWidth={2} />
+                <Area type="monotone" dataKey="cpa" name="Cost per Result" stroke="#ff9800" fill={`url(#${orangeGradientId})`} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

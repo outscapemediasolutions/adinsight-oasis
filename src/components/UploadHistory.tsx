@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 const UploadHistory = () => {
   const [uploads, setUploads] = useState<UploadRecord[]>([]);
@@ -111,7 +112,11 @@ const UploadHistory = () => {
   // Format date for display
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
   
   // Format date range for display
@@ -204,15 +209,26 @@ const UploadHistory = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownload(upload.id, "csv")}
-                          disabled={isDownloading === upload.id}
-                          className="h-8 w-8"
-                        >
-                          <Download className={`h-4 w-4 ${isDownloading === upload.id ? 'animate-spin' : ''}`} />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={isDownloading === upload.id}
+                              className="h-8 w-8"
+                            >
+                              <Download className={`h-4 w-4 ${isDownloading === upload.id ? 'animate-spin' : ''}`} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownload(upload.id, "csv")}>
+                              Download as CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownload(upload.id, "json")}>
+                              Download as JSON
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                           variant="ghost"
                           size="icon"
