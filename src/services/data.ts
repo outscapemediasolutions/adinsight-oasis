@@ -30,7 +30,7 @@ export interface AdData {
   purchasesValue: number;
   roas: number;
   created: any;
-  // Added missing properties to resolve TypeScript errors
+  // Added properties to resolve TypeScript errors
   spend: number;
   purchaseConversionValue: number;
   purchaseRoas: number;
@@ -49,6 +49,13 @@ export interface UploadRecord {
     start: string;
     end: string;
   };
+  columnMapping?: Record<string, string>;
+}
+
+export interface ColumnMappingHistory {
+  csvColumn: string;
+  mappedTo: string;
+  frequency: number;
 }
 
 export const validateCSVHeaders = (csvData: string) => {
@@ -106,6 +113,54 @@ export const generateCSVTemplate = () => {
     "Purchase ROAS",
   ];
   return headers.join(",") + "\n";
+};
+
+// Get column mapping suggestions based on historical mappings
+export const getColumnMappingSuggestions = async (userId: string): Promise<Record<string, string[]>> => {
+  try {
+    const suggestionsMap: Record<string, string[]> = {};
+    
+    // Get historical uploads with column mappings
+    const uploadsRef = collection(db, 'users', userId, 'upload_history');
+    const q = query(uploadsRef, where('columnMapping', '!=', null));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return suggestionsMap;
+    }
+    
+    // Collect all mappings
+    const mappingsCount: Record<string, Record<string, number>> = {};
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.columnMapping) {
+        Object.entries(data.columnMapping).forEach(([requiredCol, mappedCol]) => {
+          if (!mappingsCount[requiredCol]) {
+            mappingsCount[requiredCol] = {};
+          }
+          
+          if (!mappingsCount[requiredCol][mappedCol]) {
+            mappingsCount[requiredCol][mappedCol] = 0;
+          }
+          
+          mappingsCount[requiredCol][mappedCol]++;
+        });
+      }
+    });
+    
+    // Convert to suggestions sorted by frequency
+    Object.entries(mappingsCount).forEach(([requiredCol, mappings]) => {
+      suggestionsMap[requiredCol] = Object.entries(mappings)
+        .sort((a, b) => b[1] - a[1])
+        .map(([col]) => col);
+    });
+    
+    return suggestionsMap;
+  } catch (error) {
+    console.error("Error getting column mapping suggestions:", error);
+    return {};
+  }
 };
 
 export const getAdData = async (userId: string, filters: any = {}): Promise<AdData[]> => {
@@ -343,9 +398,14 @@ export const deleteUpload = async (userId: string, uploadId: string): Promise<bo
 };
 
 /**
- * Process and save CSV data to Firestore
+ * Process and save CSV data to Firestore with column mapping support
  */
-export const processAndSaveCSVData = async (userId: string, fileName: string, data: Record<string, string>[]) => {
+export const processAndSaveCSVData = async (
+  userId: string, 
+  fileName: string, 
+  data: Record<string, string>[],
+  columnMapping?: Record<string, string>
+) => {
   try {
     // Get a batch reference for batch operations
     const batch = writeBatch(db);
@@ -396,7 +456,7 @@ export const processAndSaveCSVData = async (userId: string, fileName: string, da
       batch.set(docRef, transformedRow);
     });
     
-    // Save upload info to upload_history collection
+    // Save upload info to upload_history collection with column mapping
     const uploadHistoryRef = doc(collection(db, 'users', userId, 'upload_history'), uploadId);
     batch.set(uploadHistoryRef, {
       id: uploadId,
@@ -409,6 +469,7 @@ export const processAndSaveCSVData = async (userId: string, fileName: string, da
         start: minDate,
         end: maxDate
       },
+      columnMapping, // Store the column mapping for future reference
       created: serverTimestamp()
     });
     
@@ -452,7 +513,8 @@ export const getUserUploads = async (userId: string): Promise<UploadRecord[]> =>
         uploadedAt: data.uploadedAt,
         recordCount: data.recordCount,
         status: data.status,
-        dateRange: data.dateRange
+        dateRange: data.dateRange,
+        columnMapping: data.columnMapping
       });
     });
     

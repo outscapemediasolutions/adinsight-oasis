@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -32,16 +31,10 @@ import { Progress } from "@/components/ui/progress";
 
 const Upload = () => {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [showValidationError, setShowValidationError] = useState(false);
-  const [missingColumns, setMissingColumns] = useState("");
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [mappedHeaders, setMappedHeaders] = useState<string[]>([]);
-  const [csvData, setCsvData] = useState<string>("");
-  const [isCsvValid, setIsCsvValid] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [uploadDateRange, setUploadDateRange] = useState<{ start: string; end: string } | null>(null);
-  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0); // New state to trigger refreshes
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
   
   const navigate = useNavigate();
   
@@ -68,27 +61,11 @@ const Upload = () => {
     setUploadDateRange(dateRange || null);
   };
 
-  // Create a new handler for upload success
+  // Handler for upload success
   const handleUploadSuccess = () => {
     console.log("Upload successful, refreshing history...");
     // Increment the trigger to cause a refresh in the UploadHistory component
     setRefreshHistoryTrigger(prev => prev + 1);
-  };
-  
-  const handleCSVValidation = (csvData: string) => {
-    const result = validateCSVHeaders(csvData);
-    
-    if (!result.isValid) {
-      setValidationErrors(result.missingHeaders);
-      setMissingColumns(result.missingHeaders.join(", "));
-      setShowValidationError(true);
-      return false;
-    }
-    
-    setValidationErrors([]);
-    setShowValidationError(false);
-    setMappedHeaders(result.mappedHeaders);
-    return true;
   };
   
   return (
@@ -111,8 +88,7 @@ const Upload = () => {
               <CSVUpload
                 onUploadStart={handleUploadStart}
                 onUploadComplete={handleUploadComplete}
-                onValidate={handleCSVValidation}
-                onUploadSuccess={handleUploadSuccess} // Add new callback
+                onUploadSuccess={handleUploadSuccess}
               />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
@@ -212,36 +188,11 @@ const Upload = () => {
                   </Table>
                 </div>
                 <p>
-                  Ensure that the CSV file is properly formatted, with each column separated by a comma.
+                  If your CSV file uses different column names, our tool will help you map them during the upload process.
                 </p>
               </div>
               <DialogFooter>
                 <Button type="button" onClick={() => setShowTemplateDialog(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          
-          <Dialog open={showValidationError} onOpenChange={setShowValidationError}>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>CSV Validation Error</DialogTitle>
-                <DialogDescription>
-                  The CSV file is missing required columns. Please update the file and try again.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Missing Columns</AlertTitle>
-                  <AlertDescription>
-                    {missingColumns}
-                  </AlertDescription>
-                </Alert>
-              </div>
-              <DialogFooter>
-                <Button type="button" onClick={() => setShowValidationError(false)}>
                   Close
                 </Button>
               </DialogFooter>
