@@ -136,7 +136,9 @@ export const getColumnMappingSuggestions = async (userId: string): Promise<Recor
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.columnMapping) {
-        Object.entries(data.columnMapping as Record<string, string>).forEach(([requiredCol, mappedCol]) => {
+        // Ensure we're using the correct type for columnMapping
+        const mapping = data.columnMapping as Record<string, string>;
+        Object.entries(mapping).forEach(([requiredCol, mappedCol]) => {
           if (!mappingsCount[requiredCol]) {
             mappingsCount[requiredCol] = {};
           }
@@ -405,7 +407,7 @@ export const processAndSaveCSVData = async (
   userId: string, 
   fileName: string, 
   data: Record<string, string>[],
-  columnMapping?: Record<string, string>
+  columnMapping: Record<string, string> | null = null
 ) => {
   try {
     // Get a batch reference for batch operations
@@ -457,9 +459,8 @@ export const processAndSaveCSVData = async (
       batch.set(docRef, transformedRow);
     });
     
-    // Save upload info to upload_history collection with column mapping
-    const uploadHistoryRef = doc(collection(db, 'users', userId, 'upload_history'), uploadId);
-    batch.set(uploadHistoryRef, {
+    // Prepare upload history document data with safe handling of columnMapping
+    const uploadHistoryData = {
       id: uploadId,
       userId,
       fileName,
@@ -470,9 +471,14 @@ export const processAndSaveCSVData = async (
         start: minDate,
         end: maxDate
       },
-      columnMapping, // Store the column mapping for future reference
+      // Ensure columnMapping is never undefined
+      columnMapping: columnMapping || null,
       created: serverTimestamp()
-    });
+    };
+    
+    // Save upload info to upload_history collection with validated column mapping
+    const uploadHistoryRef = doc(collection(db, 'users', userId, 'upload_history'), uploadId);
+    batch.set(uploadHistoryRef, uploadHistoryData);
     
     // Commit the batch
     await batch.commit();

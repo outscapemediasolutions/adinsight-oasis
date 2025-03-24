@@ -84,6 +84,7 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const form = useForm<MappingFormValues>({
     defaultValues: {
@@ -93,6 +94,12 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
   
   // Reset upload state
   const resetUpload = () => {
+    // Clear the interval if it exists
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    
     setFile(null);
     setUploading(false);
     setUploadProgress(0);
@@ -232,11 +239,13 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
     }
     
     try {
-      // Store interval reference in a variable that can be cleared later
-      let progressInterval: NodeJS.Timeout | null = null;
+      // Clear any existing interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
       
-      // Simulate upload progress
-      progressInterval = setInterval(() => {
+      // Simulate upload progress with a properly tracked interval
+      progressIntervalRef.current = setInterval(() => {
         setUploadProgress(prev => {
           const newProgress = prev + Math.random() * 10;
           return newProgress > 90 ? 90 : newProgress;
@@ -285,16 +294,23 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
         }
       });
       
-      // Process and save data
+      // Make sure we have a valid column mapping object (not undefined)
+      const mappingToSave = Object.keys(columnMapping).length > 0 ? columnMapping : null;
+      
+      // Process and save data with the column mapping
       const result = await processAndSaveCSVData(
         currentUser.uid,
         file.name,
-        normalizedData
+        normalizedData,
+        mappingToSave
       );
       
-      if (progressInterval) {
-        clearInterval(progressInterval);
+      // Clean up interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
+      
       setUploadProgress(100);
       
       // Use a slight delay for better UX
@@ -316,9 +332,12 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
         toast.success("CSV data uploaded successfully");
       }, 500);
     } catch (error) {
-      if (progressInterval) {
-        clearInterval(progressInterval);
+      // Clean up interval in case of error
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
+      
       console.error("Error processing CSV:", error);
       setError(`Error processing CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setUploading(false);
