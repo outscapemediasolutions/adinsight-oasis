@@ -1,3 +1,4 @@
+
 import { db } from "./firebase";
 import { 
   collection, 
@@ -135,7 +136,7 @@ export const getColumnMappingSuggestions = async (userId: string): Promise<Recor
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.columnMapping) {
-        Object.entries(data.columnMapping).forEach(([requiredCol, mappedCol]) => {
+        Object.entries(data.columnMapping as Record<string, string>).forEach(([requiredCol, mappedCol]) => {
           if (!mappingsCount[requiredCol]) {
             mappingsCount[requiredCol] = {};
           }

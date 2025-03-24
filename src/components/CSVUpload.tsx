@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, ChangeEvent } from "react";
 import { useDropzone } from "react-dropzone";
 import { useAuth } from "@/contexts/AuthContext";
@@ -233,8 +232,11 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
     }
     
     try {
+      // Store interval reference in a variable that can be cleared later
+      let progressInterval: NodeJS.Timeout | null = null;
+      
       // Simulate upload progress
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           const newProgress = prev + Math.random() * 10;
           return newProgress > 90 ? 90 : newProgress;
@@ -290,7 +292,9 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
         normalizedData
       );
       
-      clearInterval(progressInterval);
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setUploadProgress(100);
       
       // Use a slight delay for better UX
@@ -312,7 +316,9 @@ const CSVUpload: React.FC<CSVUploadProps> = ({
         toast.success("CSV data uploaded successfully");
       }, 500);
     } catch (error) {
-      clearInterval(progressInterval);
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       console.error("Error processing CSV:", error);
       setError(`Error processing CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setUploading(false);
