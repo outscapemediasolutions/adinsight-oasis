@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, ComposedChart, Area, ReferenceLine, AreaChart
 } from "recharts";
-import { AdData, getDataByDate, calculateMetrics } from "@/services/data";
+import { AdData, calculateMetrics } from "@/services/data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +83,8 @@ const PerformanceChart = ({
         const processedData = Array.from(dateMap.entries())
           .map(([date, items]) => {
             // Sum up values for the date
-            const spend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
-            const revenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            const spend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
+            const revenue = items.reduce((sum, item) => sum + (item.purchasesValue || 0), 0);
             
             return {
               date,
@@ -113,14 +112,14 @@ const PerformanceChart = ({
         const processedData = Array.from(dateMap.entries())
           .map(([date, items]) => {
             // Get weighted average ROAS based on spend
-            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
             
             if (totalSpend === 0) return { date, roas: 0, target: 3.0 };
             
             const weightedRoas = items.reduce((sum, item) => {
-              const spend = item.spend || 0;
+              const spend = item.amountSpent || 0;
               const weight = totalSpend > 0 ? spend / totalSpend : 0;
-              return sum + ((item.purchaseRoas || 0) * weight);
+              return sum + ((item.roas || 0) * weight);
             }, 0);
             
             return {
@@ -148,18 +147,18 @@ const PerformanceChart = ({
         const processedData = Array.from(dateMap.entries())
           .map(([date, items]) => {
             // Get weighted average CPC and CPA based on spend
-            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
             
             if (totalSpend === 0) return { date, cpc: 0, cpa: 0 };
             
             const weightedCpc = items.reduce((sum, item) => {
-              const spend = item.spend || 0;
+              const spend = item.amountSpent || 0;
               const weight = totalSpend > 0 ? spend / totalSpend : 0;
               return sum + ((item.cpc || 0) * weight);
             }, 0);
             
             const weightedCpa = items.reduce((sum, item) => {
-              const spend = item.spend || 0;
+              const spend = item.amountSpent || 0;
               const weight = totalSpend > 0 ? spend / totalSpend : 0;
               return sum + ((item.costPerResult || 0) * weight);
             }, 0);
@@ -189,7 +188,7 @@ const PerformanceChart = ({
         const processedData = Array.from(dateMap.entries())
           .map(([date, items]) => {
             // Sum up values for the date
-            const clicks = items.reduce((sum, item) => sum + (item.clicks || 0), 0);
+            const clicks = items.reduce((sum, item) => sum + (item.linkClicks || 0), 0);
             
             // Only count results as orders for sales campaigns
             const orders = items.reduce((sum, item) => {
@@ -262,9 +261,9 @@ const PerformanceChart = ({
         // Calculate conversion rate for each campaign
         const processedData = Array.from(campaigns.entries())
           .map(([campaign, items]) => {
-            const totalClicks = items.reduce((sum, item) => sum + (item.clicks || 0), 0);
+            const totalClicks = items.reduce((sum, item) => sum + (item.linkClicks || 0), 0);
             const totalPurchases = items.reduce((sum, item) => sum + (item.purchases || 0), 0);
-            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
             
             // Calculate conversion rate
             const cvr = totalClicks > 0 ? (totalPurchases / totalClicks) * 100 : 0;
@@ -293,8 +292,8 @@ const PerformanceChart = ({
         // Calculate metrics for each campaign
         const processedData = Array.from(campaigns.entries())
           .map(([campaign, items]) => {
-            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
-            const totalRevenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
+            const totalRevenue = items.reduce((sum, item) => sum + (item.purchasesValue || 0), 0);
             
             return {
               campaign: campaign.length > 20 ? campaign.substring(0, 20) + "..." : campaign,
@@ -321,8 +320,8 @@ const PerformanceChart = ({
         // Calculate metrics for each ad set
         const processedData = Array.from(adSets.entries())
           .map(([adSet, items]) => {
-            const totalSpend = items.reduce((sum, item) => sum + (item.spend || 0), 0);
-            const totalRevenue = items.reduce((sum, item) => sum + (item.purchaseConversionValue || 0), 0);
+            const totalSpend = items.reduce((sum, item) => sum + (item.amountSpent || 0), 0);
+            const totalRevenue = items.reduce((sum, item) => sum + (item.purchasesValue || 0), 0);
             const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
             
             return {
@@ -448,6 +447,39 @@ const PerformanceChart = ({
                 <Legend />
                 <Area type="monotone" dataKey="cpc" name="Cost per Click" stroke="#64b5f6" fill={`url(#${blueGradientId})`} strokeWidth={2} />
                 <Area type="monotone" dataKey="cpa" name="Cost per Result" stroke="#ff9800" fill={`url(#${orangeGradientId})`} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case "ordersVsVisitors":
+        return (
+          <div className="relative h-full">
+            <svg style={{ height: 0 }}>
+              <defs>
+                <linearGradient id={blueGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#64b5f6" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#64b5f6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id={orangeGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ff9800" stopOpacity={0.8} />
+                  <stop offset="100%" stopColor="#ff9800" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+            </svg>
+            <ResponsiveContainer width="100%" height={height}>
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#37474f" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={(value) => value} stroke="#e0f2f1" />
+                <YAxis stroke="#e0f2f1" />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  formatter={(value: number, name: string) => {
+                    return [value, name === "clicks" ? "Link Clicks" : name === "orders" ? "Orders" : "Conversion Rate", ""];
+                  }}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="clicks" name="Link Clicks" stroke="#64b5f6" fill={`url(#${blueGradientId})`} strokeWidth={2} />
+                <Area type="monotone" dataKey="orders" name="Orders" stroke="#ff9800" fill={`url(#${orangeGradientId})`} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

@@ -45,6 +45,9 @@ interface AnalyticsSummaryProps {
     totalOrders: number;
     totalVisitors: number;
     roas: number;
+    ctr: number;
+    cpc: number;
+    cpm: number;
   };
   isLoading?: boolean;
 }
@@ -54,7 +57,10 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
     totalSales: data?.totalSales || 0,
     totalOrders: data?.totalOrders || 0,
     totalVisitors: data?.totalVisitors || 0,
-    roas: data?.roas || 0
+    roas: data?.roas || 0,
+    ctr: data?.ctr || 0,
+    cpc: data?.cpc || 0,
+    cpm: data?.cpm || 0
   };
 
   if (isLoading) {

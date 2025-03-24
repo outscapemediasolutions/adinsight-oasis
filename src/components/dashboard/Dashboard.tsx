@@ -40,8 +40,8 @@ const Dashboard = () => {
           const campaignPerformance = getCampaignPerformance(data);
           const formattedCampaignData = campaignPerformance.map(campaign => ({
             name: campaign.campaignName,
-            spend: campaign.metrics.totalSpend,
-            sales: campaign.metrics.totalSales,
+            spend: campaign.metrics.spend,
+            sales: campaign.metrics.sales,
             roas: campaign.metrics.roas
           }));
           
@@ -79,8 +79,8 @@ const Dashboard = () => {
         const campaignPerformance = getCampaignPerformance(data);
         const formattedCampaignData = campaignPerformance.map(campaign => ({
           name: campaign.campaignName,
-          spend: campaign.metrics.totalSpend,
-          sales: campaign.metrics.totalSales,
+          spend: campaign.metrics.spend,
+          sales: campaign.metrics.sales,
           roas: campaign.metrics.roas
         }));
         
@@ -139,7 +139,10 @@ const Dashboard = () => {
           totalSales: metrics.totalSales,
           totalOrders: metrics.totalOrders,
           totalVisitors: metrics.totalVisitors,
-          roas: metrics.roas
+          roas: metrics.roas,
+          ctr: metrics.ctr,
+          cpc: metrics.cpc,
+          cpm: metrics.cpm
         } : undefined}
         isLoading={isLoading} 
       />

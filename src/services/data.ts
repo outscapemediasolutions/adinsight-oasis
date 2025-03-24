@@ -1,4 +1,4 @@
-import { db } from "@/firebase";
+import { db } from "./firebase";
 import { 
   collection, 
   doc, 
@@ -30,6 +30,12 @@ export interface AdData {
   purchasesValue: number;
   roas: number;
   created: any;
+  // Added missing properties to resolve TypeScript errors
+  spend: number;
+  purchaseConversionValue: number;
+  purchaseRoas: number;
+  clicks: number;
+  cpm: number;
 }
 
 export interface UploadRecord {
@@ -126,7 +132,15 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
     const adData: AdData[] = [];
     
     snapshot.forEach(doc => {
-      adData.push(doc.data() as AdData);
+      const data = doc.data() as AdData;
+      // Map missing properties from existing ones to ensure compatibility
+      data.spend = data.amountSpent;
+      data.purchaseConversionValue = data.purchasesValue;
+      data.purchaseRoas = data.roas;
+      data.clicks = data.linkClicks;
+      data.cpm = (data.amountSpent / data.impressions) * 1000 || 0;
+      
+      adData.push(data);
     });
     
     return adData;
@@ -141,52 +155,88 @@ export const calculateMetrics = (data: AdData[]) => {
   let totalOrders = 0;
   let totalVisitors = 0;
   let totalSpent = 0;
+  let totalImpressions = 0;
+  let totalClicks = 0;
   
   data.forEach(item => {
     totalSales += item.purchasesValue;
     totalOrders += item.purchases;
     totalVisitors += item.linkClicks;
     totalSpent += item.amountSpent;
+    totalImpressions += item.impressions;
+    totalClicks += item.linkClicks;
   });
   
   const roas = totalSpent > 0 ? totalSales / totalSpent : 0;
+  const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const cpc = totalClicks > 0 ? totalSpent / totalClicks : 0;
+  const cpm = totalImpressions > 0 ? (totalSpent / totalImpressions) * 1000 : 0;
   
   return {
     totalSales,
     totalOrders,
     totalVisitors,
-    roas
+    roas,
+    ctr,
+    cpc,
+    cpm
   };
 };
 
 export const getCampaignPerformance = (data: AdData[]) => {
-  const campaignPerformance: { [campaignName: string]: { impressions: number; clicks: number } } = {};
+  const campaignMap = new Map<string, { impressions: number; clicks: number; spend: number; sales: number; roas: number }>();
   
   data.forEach(item => {
-    if (!campaignPerformance[item.campaignName]) {
-      campaignPerformance[item.campaignName] = { impressions: 0, clicks: 0 };
+    if (!campaignMap.has(item.campaignName)) {
+      campaignMap.set(item.campaignName, { 
+        impressions: 0, 
+        clicks: 0,
+        spend: 0,
+        sales: 0,
+        roas: 0
+      });
     }
     
-    campaignPerformance[item.campaignName].impressions += item.impressions;
-    campaignPerformance[item.campaignName].clicks += item.linkClicks;
+    const campaignData = campaignMap.get(item.campaignName)!;
+    campaignData.impressions += item.impressions;
+    campaignData.clicks += item.linkClicks;
+    campaignData.spend += item.amountSpent;
+    campaignData.sales += item.purchasesValue;
+    campaignData.roas = campaignData.spend > 0 ? campaignData.sales / campaignData.spend : 0;
   });
   
-  return campaignPerformance;
+  return Array.from(campaignMap).map(([campaignName, metrics]) => ({
+    campaignName,
+    metrics
+  }));
 };
 
 export const getAdSetPerformance = (data: AdData[]) => {
-  const adSetPerformance: { [adSetName: string]: { impressions: number; clicks: number } } = {};
+  const adSetMap = new Map<string, { impressions: number; clicks: number; spend: number; sales: number; roas: number }>();
   
   data.forEach(item => {
-    if (!adSetPerformance[item.adSetName]) {
-      adSetPerformance[item.adSetName] = { impressions: 0, clicks: 0 };
+    if (!adSetMap.has(item.adSetName)) {
+      adSetMap.set(item.adSetName, { 
+        impressions: 0, 
+        clicks: 0,
+        spend: 0,
+        sales: 0,
+        roas: 0
+      });
     }
     
-    adSetPerformance[item.adSetName].impressions += item.impressions;
-    adSetPerformance[item.adSetName].clicks += item.linkClicks;
+    const adSetData = adSetMap.get(item.adSetName)!;
+    adSetData.impressions += item.impressions;
+    adSetData.clicks += item.linkClicks;
+    adSetData.spend += item.amountSpent;
+    adSetData.sales += item.purchasesValue;
+    adSetData.roas = adSetData.spend > 0 ? adSetData.sales / adSetData.spend : 0;
   });
   
-  return adSetPerformance;
+  return Array.from(adSetMap).map(([adSetName, metrics]) => ({
+    adSetName,
+    metrics
+  }));
 };
 
 export const getUniqueCampaigns = (data: AdData[]): string[] => {
