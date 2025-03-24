@@ -8,7 +8,15 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { parseCSVData, saveAdData, generateCSVTemplate, validateCSVHeaders, AdData, csvHeaders, columnMappings } from "@/services/data";
+import { 
+  parseCSVData, 
+  saveAdData, 
+  generateCSVTemplate, 
+  validateCSVHeaders, 
+  AdData, 
+  csvHeaders, 
+  columnMappings 
+} from "@/services/data";
 import { useAuth } from "@/contexts/AuthContext";
 import { Upload, Download, AlertTriangle, X, Check, FileText, Map } from "lucide-react";
 import { toast } from "sonner";

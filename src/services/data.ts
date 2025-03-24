@@ -1,3 +1,4 @@
+
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, writeBatch, deleteDoc, QueryConstraint } from "firebase/firestore";
 
 // Update AdData interface to match Meta Ads column structure
@@ -39,6 +40,90 @@ export const CSV_COLUMN_MAPPING: Record<string, string> = {
   'Purchase ROAS': 'purchaseRoas'
 };
 
+// List of CSV headers for template
+export const csvHeaders = [
+  'Date',
+  'Campaign name',
+  'Ad set name',
+  'Objective',
+  'Impressions',
+  'Link clicks',
+  'CTR (All)',
+  'CPC (cost per link click)',
+  'Amount spent (INR)',
+  'Results',
+  'Cost per result',
+  'Purchases',
+  'Purchases conversion value',
+  'Purchase ROAS'
+];
+
+// Generate a CSV template with headers and sample data
+export const generateCSVTemplate = (): string => {
+  // Create headers row
+  const headerRow = csvHeaders.join(',');
+  
+  // Create sample data rows
+  const sampleRows = [
+    // Sample row 1: E-commerce campaign with good ROAS
+    [
+      '2023-01-01',
+      'Summer Sale Campaign',
+      'Broad Audience',
+      'Sales',
+      '5000',
+      '150',
+      '3%',
+      '15.5',
+      '2325',
+      '25',
+      '93',
+      '20',
+      '6500',
+      '2.8'
+    ].join(','),
+    
+    // Sample row 2: Traffic campaign with high CTR
+    [
+      '2023-01-02',
+      'Brand Awareness',
+      'Lookalike Audience',
+      'Traffic',
+      '10000',
+      '450',
+      '4.5%',
+      '10.2',
+      '4590',
+      '450',
+      '10.2',
+      '5',
+      '1500',
+      '0.33'
+    ].join(','),
+    
+    // Sample row 3: Conversion campaign for leads
+    [
+      '2023-01-03',
+      'Lead Generation',
+      'Interest Targeting',
+      'Lead generation',
+      '7500',
+      '200',
+      '2.67%',
+      '18.75',
+      '3750',
+      '35',
+      '107.14',
+      '0',
+      '0',
+      '0'
+    ].join(',')
+  ];
+  
+  // Combine headers and sample data
+  return [headerRow, ...sampleRows].join('\n');
+};
+
 // Required columns for validation
 export const REQUIRED_COLUMNS = [
   'Date',
@@ -54,6 +139,60 @@ export const REQUIRED_COLUMNS = [
   'Link clicks',
   'Impressions'
 ];
+
+// Define column mappings for header validation
+export const columnMappings: Record<string, string[]> = {
+  'Date': ['date', 'reporting date'],
+  'Campaign name': ['campaign name', 'campaign', 'campaign_name'],
+  'Ad set name': ['ad set name', 'ad set', 'adset name', 'adset'],
+  'Objective': ['objective', 'campaign objective'],
+  'Impressions': ['impressions', 'impr.'],
+  'Link clicks': ['link clicks', 'clicks', 'link click'],
+  'CTR (All)': ['ctr (all)', 'ctr', 'click-through rate', 'clickthrough rate'],
+  'CPC (cost per link click)': ['cpc (cost per link click)', 'cpc', 'cost per click'],
+  'CPM (cost per 1,000 impressions)': ['cpm (cost per 1,000 impressions)', 'cpm', 'cost per 1000 impressions'],
+  'Amount spent (INR)': ['amount spent (inr)', 'amount spent', 'spend', 'cost'],
+  'Results': ['results', 'result', 'conversions'],
+  'Cost per result': ['cost per result', 'cpa', 'cost per acquisition', 'cost per conversion'],
+  'Purchases': ['purchases', 'purchase', 'conversions: purchase'],
+  'Purchases conversion value': ['purchases conversion value', 'conversion value', 'purchase value', 'revenue'],
+  'Purchase ROAS': ['purchase roas', 'roas', 'return on ad spend']
+};
+
+// Validate CSV headers against required columns
+export const validateCSVHeaders = (csvData: string) => {
+  const lines = csvData.split('\n');
+  if (lines.length === 0) {
+    return {
+      isValid: false,
+      missingHeaders: ['Empty file'],
+      mappedHeaders: []
+    };
+  }
+  
+  const headers = lines[0].split(',').map(h => h.trim());
+  
+  // Compare headers against required columns using case-insensitive comparison
+  const missingHeaders: string[] = [];
+  const mappedHeaders = [...headers];
+  
+  REQUIRED_COLUMNS.forEach(requiredHeader => {
+    const mappingOptions = columnMappings[requiredHeader] || [requiredHeader.toLowerCase()];
+    const headerExists = headers.some(header => 
+      mappingOptions.includes(header.toLowerCase())
+    );
+    
+    if (!headerExists) {
+      missingHeaders.push(requiredHeader);
+    }
+  });
+  
+  return {
+    isValid: missingHeaders.length === 0,
+    missingHeaders,
+    mappedHeaders
+  };
+};
 
 // Validate CSV data has all required columns
 export const validateCSVData = (headers: string[]) => {
@@ -96,6 +235,70 @@ export const convertCSVRowToAdData = (row: Record<string, string>, userId: strin
   return adData as AdData;
 };
 
+// Helper function to parse CSV data
+export const parseCSVData = (csvText: string, columnMapping: Record<string, string> = {}): AdData[] => {
+  const lines = csvText.trim().split('\n');
+  if (lines.length <= 1) {
+    throw new Error("CSV file does not contain enough data");
+  }
+  
+  // Parse headers
+  const headers = lines[0].split(',').map(h => h.trim());
+  
+  // Apply column mapping if provided
+  const mappedHeaders = headers.map(header => {
+    if (columnMapping[header]) {
+      return columnMapping[header];
+    }
+    return header;
+  });
+  
+  // Parse data rows
+  const result: AdData[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue; // Skip empty lines
+    
+    const values = lines[i].split(',');
+    
+    // Create a record for this row
+    const record: Record<string, string> = {};
+    mappedHeaders.forEach((header, index) => {
+      if (index < values.length) {
+        record[header] = values[index].trim();
+      }
+    });
+    
+    try {
+      // Convert to AdData
+      const adData: AdData = {
+        campaignName: record['Campaign name'] || '',
+        adSetName: record['Ad set name'] || '',
+        date: record['Date'] || '',
+        objective: record['Objective'] || '',
+        impressions: parseFloat(record['Impressions']?.replace(/,/g, '') || '0'),
+        clicks: parseFloat(record['Link clicks']?.replace(/,/g, '') || '0'),
+        ctr: parseFloat(record['CTR (All)']?.replace(/%/g, '') || '0'),
+        cpc: parseFloat(record['CPC (cost per link click)']?.replace(/[₹,]/g, '') || '0'),
+        spend: parseFloat(record['Amount spent (INR)']?.replace(/[₹,]/g, '') || '0'),
+        results: parseFloat(record['Results']?.replace(/,/g, '') || '0'),
+        costPerResult: parseFloat(record['Cost per result']?.replace(/[₹,]/g, '') || '0'),
+        purchases: parseFloat(record['Purchases']?.replace(/,/g, '') || '0'),
+        purchaseConversionValue: parseFloat(record['Purchases conversion value']?.replace(/[₹,]/g, '') || '0'),
+        purchaseRoas: parseFloat(record['Purchase ROAS']?.replace(/%/g, '') || '0')
+      };
+      
+      // Add to result array
+      result.push(adData);
+    } catch (error) {
+      console.error(`Error parsing row ${i}:`, error);
+      // Continue with next row
+    }
+  }
+  
+  return result;
+};
+
 // Save upload record with metadata
 export interface DateRange {
   start: string;
@@ -112,6 +315,97 @@ export interface UploadRecord {
   dateRange?: DateRange;
   errorMessage?: string;
 }
+
+// Save ad data to Firestore
+export const saveAdData = async (
+  data: AdData[], 
+  userId: string, 
+  overwrite: boolean = false,
+  fileName: string = "upload.csv"
+): Promise<UploadRecord> => {
+  const db = getFirestore();
+  
+  // Create a reference to the upload record
+  const uploadRef = doc(collection(db, 'uploads'));
+  const uploadId = uploadRef.id;
+  
+  try {
+    console.log(`Saving ${data.length} records for user ${userId}`);
+    
+    // Extract date range from data
+    let minDate = '';
+    let maxDate = '';
+    
+    data.forEach(row => {
+      if (!minDate || row.date < minDate) minDate = row.date;
+      if (!maxDate || row.date > maxDate) maxDate = row.date;
+    });
+    
+    // Save each ad record
+    const batch = writeBatch(db);
+    const adsCollectionRef = collection(db, 'ads');
+    
+    let count = 0;
+    for (const item of data) {
+      // Add userId to the data
+      const adData = { ...item, userId };
+      
+      // Create a new document reference
+      const adRef = doc(adsCollectionRef);
+      
+      // Set the data with the document ID
+      batch.set(adRef, { ...adData, id: adRef.id });
+      count++;
+      
+      // Firestore batches are limited to 500 operations
+      if (count % 400 === 0) {
+        await batch.commit();
+        console.log(`Committed batch of ${count} records`);
+      }
+    }
+    
+    // Commit any remaining operations
+    if (count % 400 !== 0) {
+      await batch.commit();
+      console.log(`Committed final batch, total records: ${count}`);
+    }
+    
+    // Create and save upload record
+    const uploadRecord: UploadRecord = {
+      id: uploadId,
+      userId,
+      fileName,
+      uploadedAt: Date.now(),
+      status: 'completed',
+      recordCount: data.length,
+      dateRange: {
+        start: minDate,
+        end: maxDate
+      }
+    };
+    
+    await setDoc(uploadRef, uploadRecord);
+    
+    console.log(`Successfully saved ${data.length} rows and created upload record`);
+    return uploadRecord;
+  } catch (error) {
+    console.error("Error saving ad data:", error);
+    
+    // Save failed upload record
+    const uploadRecord: UploadRecord = {
+      id: uploadId,
+      userId,
+      fileName,
+      uploadedAt: Date.now(),
+      status: 'failed',
+      recordCount: 0,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+    };
+    
+    await setDoc(uploadRef, uploadRecord);
+    throw error;
+  }
+};
 
 // Process and save uploaded CSV data
 export const processAndSaveCSVData = async (
@@ -569,3 +863,4 @@ export const exportToCSV = (data: AdData[], fileName: string): void => {
   a.click();
   URL.revokeObjectURL(url);
 };
+

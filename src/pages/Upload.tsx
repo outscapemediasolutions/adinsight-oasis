@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,16 +8,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  parseCSVData, 
-  saveAdData, 
-  generateCSVTemplate, 
+  processAndSaveCSVData, 
   getUserUploads,
   downloadHistoricalData,
   deleteUpload,
-  validateCSVHeaders,
+  validateCSVData,
   UploadRecord,
   AdData,
-  csvHeaders
+  generateCSVTemplate,
+  validateCSVHeaders,
+  parseCSVData
 } from "@/services/data";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -271,7 +270,7 @@ const UploadPage = () => {
             
             // Check for potential warnings
             const warnings = [];
-            if (parsedData.some(row => row.amountSpent === 0)) {
+            if (parsedData.some(row => row.spend === 0)) {
               warnings.push("Some rows have 0 amount spent.");
             }
             if (parsedData.some(row => row.impressions < 100)) {
@@ -336,7 +335,7 @@ const UploadPage = () => {
       
       // Check for potential warnings
       const warnings = [];
-      if (parsedData.some(row => row.amountSpent === 0)) {
+      if (parsedData.some(row => row.spend === 0)) {
         warnings.push("Some rows have 0 amount spent.");
       }
       if (parsedData.some(row => row.impressions < 100)) {
@@ -381,11 +380,10 @@ const UploadPage = () => {
       setUploadStep("Uploading to database...");
       
       // Save data to Firestore
-      await saveAdData(
-        parsedData, 
-        currentUser.uid, 
-        uploadOption === "overwrite",
-        file.name
+      await processAndSaveCSVData(
+        currentUser.uid,
+        file.name,
+        parsedData
       );
       
       // Step 4: Finalizing
@@ -646,7 +644,7 @@ const UploadPage = () => {
                             <TableCell className="font-poppins">{row.date}</TableCell>
                             <TableCell className="max-w-[150px] truncate font-poppins">{row.campaignName}</TableCell>
                             <TableCell className="max-w-[150px] truncate font-poppins">{row.adSetName}</TableCell>
-                            <TableCell className="text-right font-poppins">₹{row.amountSpent.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-poppins">₹{row.spend.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-poppins">{row.results}</TableCell>
                           </TableRow>
                         ))}
