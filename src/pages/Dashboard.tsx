@@ -552,7 +552,10 @@ const Dashboard = () => {
               totalSales: metrics.totalSales,
               totalOrders: metrics.totalOrders,
               totalVisitors: metrics.totalVisitors,
-              roas: metrics.roas
+              roas: metrics.roas,
+              ctr: metrics.ctr,
+              cpc: metrics.cpc,
+              cpm: metrics.cpm
             } : undefined}
             isLoading={isLoading} 
           />
