@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdData, calculateMetrics, AdData, getCampaignPerformance } from "@/services/data";
@@ -139,12 +138,11 @@ const Dashboard = () => {
           amountSpent: metrics.totalSpent,
           purchasesValue: metrics.totalSales,
           roas: metrics.roas,
-          linkClicks: metrics.totalVisitors,
+          results: metrics.totalOrders,
           cpc: metrics.cpc,
           ctr: metrics.ctr,
           cpm: metrics.cpm,
           addsToCart: metrics.addsToCart || 0,
-          results: metrics.totalOrders
         } : undefined}
         isLoading={isLoading} 
       />

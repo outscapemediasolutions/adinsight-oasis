@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownIcon, ArrowUpIcon, DollarSign, ShoppingCart, MousePointerClick, TrendingUp, Percent, Target, BarChart4 } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, DollarSign, ShoppingCart, ShoppingBag, TrendingUp, Percent, Target, BarChart4 } from "lucide-react";
 
 interface StatCardProps {
   title: string;
@@ -45,14 +45,12 @@ interface AnalyticsSummaryProps {
     amountSpent: number;
     purchasesValue: number;
     roas: number;
-    linkClicks: number;
+    results: number;
     // Second row metrics
     cpc: number;
     ctr: number;
     cpm: number;
     addsToCart: number;
-    // Orders data
-    results: number;
   };
   isLoading?: boolean;
 }
@@ -63,14 +61,12 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
     amountSpent: data?.amountSpent || 0,
     purchasesValue: data?.purchasesValue || 0,
     roas: data?.roas || 0,
-    linkClicks: data?.linkClicks || 0,
+    results: data?.results || 0,
     // Second row metrics
     cpc: data?.cpc || 0,
     ctr: data?.ctr || 0,
     cpm: data?.cpm || 0,
     addsToCart: data?.addsToCart || 0,
-    // Orders data
-    results: data?.results || 0
   };
 
   if (isLoading) {
@@ -122,20 +118,20 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
           percentage="12% from last period"
         />
         <StatCard
+          title="Orders"
+          value={placeholderData.results.toLocaleString()}
+          description="Total purchases (conversions) from ads"
+          icon={<ShoppingBag className="h-4 w-4" />}
+          trend="up"
+          percentage="15% from last period"
+        />
+        <StatCard
           title="ROAS"
           value={`${placeholderData.roas.toFixed(2)}x`}
           description="Return on ad spend"
           icon={<TrendingUp className="h-4 w-4" />}
           trend={placeholderData.roas > 1 ? "up" : "down"}
           percentage={`${((placeholderData.roas - 1) * 100).toFixed(1)}% ROI`}
-        />
-        <StatCard
-          title="Clicks"
-          value={placeholderData.linkClicks.toLocaleString()}
-          description="Total ad-driven clicks"
-          icon={<MousePointerClick className="h-4 w-4" />}
-          trend="down"
-          percentage="3% from last period"
         />
       </div>
 
