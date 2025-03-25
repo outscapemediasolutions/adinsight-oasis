@@ -120,7 +120,7 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
         <StatCard
           title="Orders"
           value={placeholderData.results.toLocaleString()}
-          description="Total purchases (conversions) from ads"
+          description="Total conversions from your campaigns based on the result type set in Meta Ads"
           icon={<ShoppingBag className="h-4 w-4" />}
           trend="up"
           percentage="15% from last period"
@@ -165,7 +165,7 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
           title="Add to Carts"
           value={placeholderData.addsToCart.toLocaleString()}
           description="Total add to cart actions driven by ads"
-          icon={<Target className="h-4 w-4" />}
+          icon={<ShoppingCart className="h-4 w-4" />}
           trend="up"
           percentage="10% from last period"
         />

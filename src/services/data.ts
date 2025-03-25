@@ -1,4 +1,3 @@
-
 import { db } from "./firebase";
 import { 
   collection, 
@@ -37,6 +36,7 @@ export interface AdData {
   purchaseRoas: number;
   clicks: number;
   cpm: number;
+  addsToCart: number; // Added explicit addsToCart field
 }
 
 export interface UploadRecord {
@@ -76,6 +76,7 @@ export const validateCSVHeaders = (csvData: string) => {
     "Purchases",
     "Purchases conversion value",
     "Purchase ROAS",
+    "Adds to cart" // Added Adds to cart to required headers
   ];
   
   const lines = csvData.trim().split("\n");
@@ -112,6 +113,7 @@ export const generateCSVTemplate = () => {
     "Purchases",
     "Purchases conversion value",
     "Purchase ROAS",
+    "Adds to cart" // Added Adds to cart to CSV template
   ];
   return headers.join(",") + "\n";
 };
@@ -197,6 +199,8 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
       data.purchaseRoas = data.roas;
       data.clicks = data.linkClicks;
       data.cpm = (data.amountSpent / data.impressions) * 1000 || 0;
+      // Ensure addsToCart exists (default to 0 if not present)
+      data.addsToCart = data.addsToCart || 0;
       
       adData.push(data);
     });
@@ -219,8 +223,8 @@ export const calculateMetrics = (data: AdData[]) => {
   
   data.forEach(item => {
     totalSales += item.purchasesValue;
-    // Only count results as orders if the result type is "Purchases"
-    if (item.resultType.toLowerCase() === "purchases") {
+    // Count all results that have a valid result type
+    if (item.resultType && item.resultType.trim() !== '') {
       totalOrders += item.results;
     }
     totalVisitors += item.linkClicks;
@@ -228,10 +232,8 @@ export const calculateMetrics = (data: AdData[]) => {
     totalImpressions += item.impressions;
     totalClicks += item.linkClicks;
     
-    // Add to cart tracking (default to 0 if not available)
-    if ('addsToCart' in item) {
-      addsToCart += (item as any).addsToCart || 0;
-    }
+    // Add to cart tracking - always use the addsToCart field, default to 0 if not available
+    addsToCart += item.addsToCart || 0;
   });
   
   const roas = totalSpent > 0 ? totalSales / totalSpent : 0;
@@ -464,6 +466,7 @@ export const processAndSaveCSVData = async (
         purchases: parseFloat(row['Purchases']) || 0,
         purchasesValue: parseFloat(row['Purchases conversion value']) || 0,
         roas: parseFloat(row['Purchase ROAS']) || 0,
+        addsToCart: parseFloat(row['Adds to cart']) || 0, // Added addsToCart
         created: serverTimestamp()
       };
       

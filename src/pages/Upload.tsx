@@ -184,6 +184,10 @@ const Upload = () => {
                         <TableCell className="font-medium">Purchase ROAS</TableCell>
                         <TableCell>The return on ad spend for purchases (as a decimal, e.g., 2.5 for 250%)</TableCell>
                       </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Adds to cart</TableCell>
+                        <TableCell>The number of add to cart actions from the ad</TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </div>
