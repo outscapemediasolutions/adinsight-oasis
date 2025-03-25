@@ -553,14 +553,12 @@ const Dashboard = () => {
               amountSpent: metrics.totalSpent,
               purchasesValue: metrics.totalSales,
               roas: metrics.roas,
-              linkClicks: metrics.totalVisitors,
+              results: metrics.totalOrders,
               // Second row metrics
               cpc: metrics.cpc,
               ctr: metrics.ctr,
               cpm: metrics.cpm,
               addsToCart: metrics.addsToCart || 0,
-              // Orders data
-              results: metrics.totalOrders
             } : undefined}
             isLoading={isLoading} 
           />
