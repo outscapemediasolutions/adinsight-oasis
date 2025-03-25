@@ -18,7 +18,8 @@ import {
   AreaChart, 
   Area, 
   Tooltip,
-  ReferenceLine
+  ReferenceLine,
+  Legend
 } from "recharts";
 import { ArrowUpDown } from "lucide-react";
 
@@ -47,32 +48,41 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     { name: "Clearance", spend: 6500, sales: 9750, roas: 1.5, conversionRate: 1.2 }
   ];
 
+  // Add validation to ensure we have valid numbers in our data
+  const validatedChartData = chartData.map(item => ({
+    ...item,
+    spend: Number(item.spend) || 0,
+    sales: Number(item.sales) || 0,
+    roas: Number(item.roas) || 0,
+    conversionRate: Number(item.conversionRate) || 0
+  }));
+
   // Only sort if we have real data (not placeholder data)
   const sortedByRoas = data 
-    ? [...chartData]
+    ? [...validatedChartData]
         .filter(item => item && item.roas !== undefined) // Filter out undefined ROAS
         .sort((a, b) => (b.roas || 0) - (a.roas || 0))
-    : chartData;
+    : validatedChartData;
     
   const sortedBySpend = data
-    ? [...chartData]
+    ? [...validatedChartData]
         .filter(item => item && item.spend !== undefined) // Filter out undefined spend
         .sort((a, b) => (b.spend || 0) - (a.spend || 0))
-    : chartData;
+    : validatedChartData;
     
   const sortedBySales = data
-    ? [...chartData]
+    ? [...validatedChartData]
         .filter(item => item && item.sales !== undefined) // Filter out undefined sales
         .sort((a, b) => (b.sales || 0) - (a.sales || 0))
-    : chartData;
+    : validatedChartData;
 
   const sortedByConversion = data
-    ? [...chartData]
+    ? [...validatedChartData]
         .filter(item => item && item.conversionRate !== undefined) // Filter out undefined conversion rate
         .sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0))
-    : chartData;
+    : validatedChartData;
 
-  // Updated color palette to match the reference image
+  // Updated color palette with higher visibility
   const colors = {
     roas: "#ffcc00",
     spend: "#ff9800",
@@ -147,6 +157,26 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     </div>
   );
 
+  // Function to render the x-axis labels with rotation and truncation
+  const renderCustomAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text 
+          x={0} 
+          y={0} 
+          dy={16} 
+          textAnchor="end" 
+          fill="#e0f2f1" 
+          transform="rotate(-45)"
+          fontSize={12}
+        >
+          {truncateName(payload.value)}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <Card className="bg-[#0B2537] border-white/10">
       <CardHeader>
@@ -166,22 +196,13 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={sortedByRoas} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
-                    <defs>
-                      <linearGradient id="roasGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={gradientColors.roas[0]} stopOpacity={0.8} />
-                        <stop offset="95%" stopColor={gradientColors.roas[1]} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={sortedByRoas} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      tickFormatter={truncateName}
-                      angle={45}
-                      textAnchor="start"
                       height={60}
                     />
                     <YAxis 
@@ -198,17 +219,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
                     />
                     <ReferenceLine y={3} stroke="#ffcc00" strokeDasharray="3 3" label={{ value: "Target: 3x", fill: "#ffcc00", position: "insideBottomRight" }} />
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="roas" 
                       name="ROAS" 
-                      stroke={colors.roas} 
-                      fillOpacity={1}
-                      fill="url(#roasGradient)"
-                      strokeWidth={3}
-                      connectNulls={true}
-                    />
-                  </AreaChart>
+                      fill={colors.roas}
+                      isAnimationActive={true}
+                    >
+                      {sortedByRoas.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors.roas} />
+                      ))}
+                    </Bar>
+                    <Legend />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
@@ -217,22 +239,13 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={sortedBySpend} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
-                    <defs>
-                      <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={gradientColors.spend[0]} stopOpacity={0.8} />
-                        <stop offset="95%" stopColor={gradientColors.spend[1]} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={sortedBySpend} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      tickFormatter={truncateName}
-                      angle={45}
-                      textAnchor="start"
                       height={60}
                     />
                     <YAxis 
@@ -248,17 +261,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       labelStyle={{ color: "#e0f2f1" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
                     />
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="spend" 
                       name="Ad Spend" 
-                      stroke={colors.spend}
-                      fillOpacity={1}
-                      fill="url(#spendGradient)"
-                      strokeWidth={3}
-                      connectNulls={true}
-                    />
-                  </AreaChart>
+                      fill={colors.spend}
+                      isAnimationActive={true}
+                    >
+                      {sortedBySpend.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors.spend} />
+                      ))}
+                    </Bar>
+                    <Legend />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
@@ -267,22 +281,13 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={sortedBySales} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
-                    <defs>
-                      <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={gradientColors.sales[0]} stopOpacity={0.8} />
-                        <stop offset="95%" stopColor={gradientColors.sales[1]} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={sortedBySales} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      tickFormatter={truncateName}
-                      angle={45}
-                      textAnchor="start"
                       height={60}
                     />
                     <YAxis 
@@ -298,17 +303,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       labelStyle={{ color: "#e0f2f1" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
                     />
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="sales" 
                       name="Sales Revenue" 
-                      stroke={colors.sales}
-                      fillOpacity={1}
-                      fill="url(#salesGradient)"
-                      strokeWidth={3}
-                      connectNulls={true}
-                    />
-                  </AreaChart>
+                      fill={colors.sales}
+                      isAnimationActive={true}
+                    >
+                      {sortedBySales.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors.sales} />
+                      ))}
+                    </Bar>
+                    <Legend />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
@@ -317,22 +323,13 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={sortedByConversion} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
-                    <defs>
-                      <linearGradient id="conversionGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={gradientColors.conversion[0]} stopOpacity={0.8} />
-                        <stop offset="95%" stopColor={gradientColors.conversion[1]} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={sortedByConversion} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      tickFormatter={truncateName}
-                      angle={45}
-                      textAnchor="start"
                       height={60}
                     />
                     <YAxis 
@@ -348,17 +345,18 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       labelStyle={{ color: "#e0f2f1" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
                     />
-                    <Area 
-                      type="monotone" 
+                    <Bar 
                       dataKey="conversionRate" 
                       name="Conversion Rate" 
-                      stroke={colors.conversion}
-                      fillOpacity={1}
-                      fill="url(#conversionGradient)"
-                      strokeWidth={3}
-                      connectNulls={true}
-                    />
-                  </AreaChart>
+                      fill={colors.conversion}
+                      isAnimationActive={true}
+                    >
+                      {sortedByConversion.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={colors.conversion} />
+                      ))}
+                    </Bar>
+                    <Legend />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}

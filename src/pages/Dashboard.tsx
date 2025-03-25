@@ -227,6 +227,7 @@ const Dashboard = () => {
       if (filtered.length > 0) {
         const calculatedMetrics = calculateMetrics(filtered);
         setMetrics(calculatedMetrics);
+        console.log("Dashboard: Updated metrics after date range change", calculatedMetrics);
       } else {
         setMetrics(null);
         toast.warning("No data available for the selected filters");
@@ -427,17 +428,34 @@ const Dashboard = () => {
   }
   
   const prepareCampaignChartData = () => {
-    if (!filteredData || filteredData.length === 0) return [];
+    if (!filteredData || filteredData.length === 0) {
+      console.warn("No filtered data available for campaign chart");
+      return [];
+    }
     
     const campaignPerformance = getCampaignPerformance(filteredData);
+    console.log(`Preparing chart data from ${campaignPerformance.length} campaigns`);
     
-    return campaignPerformance.map(campaign => ({
+    // Log the first campaign for debugging
+    if (campaignPerformance.length > 0) {
+      console.log("Sample campaign data:", campaignPerformance[0]);
+    }
+    
+    const chartData = campaignPerformance.map(campaign => ({
       name: campaign.campaignName,
       spend: campaign.metrics.spend,
       sales: campaign.metrics.sales,
       roas: campaign.metrics.roas,
       conversionRate: campaign.metrics.conversionRate
     }));
+    
+    // Log the transformed data for debugging
+    console.log(`Transformed ${chartData.length} campaigns for chart data`);
+    if (chartData.length > 0) {
+      console.log("Sample transformed campaign:", chartData[0]);
+    }
+    
+    return chartData;
   };
   
   const campaignChartData = prepareCampaignChartData();

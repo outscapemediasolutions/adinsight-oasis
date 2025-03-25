@@ -199,7 +199,7 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
       data.purchaseConversionValue = data.purchasesValue;
       data.purchaseRoas = data.roas;
       data.clicks = data.linkClicks;
-      data.cpm = (data.amountSpent / data.impressions) * 1000 || 0;
+      data.cpm = data.impressions > 0 ? (data.amountSpent / data.impressions) * 1000 : 0;
       // Ensure addsToCart exists (default to 0 if not present)
       data.addsToCart = data.addsToCart || 0;
       
@@ -210,9 +210,25 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
         data.conversionRate = 0;
       }
       
+      // Log data for debugging
+      if (adData.length === 0) {
+        console.log("Sample data item:", {
+          date: data.date,
+          campaignName: data.campaignName,
+          roas: data.roas,
+          spend: data.spend,
+          sales: data.purchasesValue,
+          clicks: data.clicks,
+          impressions: data.impressions,
+          results: data.results,
+          conversionRate: data.conversionRate
+        });
+      }
+      
       adData.push(data);
     });
     
+    console.log(`Retrieved ${adData.length} ad data records`);
     return adData;
   } catch (error) {
     console.error("Error getting ad data:", error);
@@ -221,6 +237,8 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
 };
 
 export const calculateMetrics = (data: AdData[]) => {
+  console.log(`Calculating metrics for ${data.length} records`);
+  
   let totalSales = 0;
   let totalOrders = 0;
   let totalVisitors = 0;
@@ -230,18 +248,18 @@ export const calculateMetrics = (data: AdData[]) => {
   let addsToCart = 0;
   
   data.forEach(item => {
-    totalSales += item.purchasesValue;
+    totalSales += Number(item.purchasesValue) || 0;
     // Count all results that have a valid result type
     if (item.resultType && item.resultType.trim() !== '') {
-      totalOrders += item.results;
+      totalOrders += Number(item.results) || 0;
     }
-    totalVisitors += item.linkClicks;
-    totalSpent += item.amountSpent;
-    totalImpressions += item.impressions;
-    totalClicks += item.linkClicks;
+    totalVisitors += Number(item.linkClicks) || 0;
+    totalSpent += Number(item.amountSpent) || 0;
+    totalImpressions += Number(item.impressions) || 0;
+    totalClicks += Number(item.linkClicks) || 0;
     
     // Add to cart tracking - always use the addsToCart field, default to 0 if not available
-    addsToCart += item.addsToCart || 0;
+    addsToCart += Number(item.addsToCart) || 0;
   });
   
   // Safely calculate ratios to avoid division by zero
@@ -251,7 +269,7 @@ export const calculateMetrics = (data: AdData[]) => {
   const cpm = totalImpressions > 0 ? (totalSpent / totalImpressions) * 1000 : 0;
   const conversionRate = totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0;
   
-  return {
+  const metrics = {
     totalSales,
     totalOrders,
     totalVisitors,
@@ -263,6 +281,9 @@ export const calculateMetrics = (data: AdData[]) => {
     addsToCart,
     conversionRate
   };
+  
+  console.log("Calculated metrics:", metrics);
+  return metrics;
 };
 
 export const getCampaignPerformance = (data: AdData[]) => {
@@ -581,6 +602,8 @@ export const getUserUploads = async (userId: string): Promise<UploadRecord[]> =>
 
 // New helper function to group data by date for trend charts
 export const groupByDate = (data: AdData[]) => {
+  console.log(`Grouping ${data.length} records by date`);
+  
   const dateMap = new Map<string, {
     date: string;
     impressions: number;
@@ -591,6 +614,8 @@ export const groupByDate = (data: AdData[]) => {
     orders: number;
     ctr: number;
     conversionRate: number;
+    cpc: number;
+    costPerResult: number;
   }>();
   
   // Sort data by date first
@@ -607,29 +632,51 @@ export const groupByDate = (data: AdData[]) => {
         roas: 0,
         orders: 0,
         ctr: 0,
-        conversionRate: 0
+        conversionRate: 0,
+        cpc: 0,
+        costPerResult: 0
       });
     }
     
     const dateData = dateMap.get(item.date)!;
-    dateData.impressions += item.impressions;
-    dateData.clicks += item.linkClicks;
-    dateData.spent += item.amountSpent;
-    dateData.sales += item.purchasesValue;
+    dateData.impressions += Number(item.impressions) || 0;
+    dateData.clicks += Number(item.linkClicks) || 0;
+    dateData.spent += Number(item.amountSpent) || 0;
+    dateData.sales += Number(item.purchasesValue) || 0;
+    dateData.cpc = Number(item.cpc) || 0;
+    dateData.costPerResult = Number(item.costPerResult) || 0;
     
     // Count orders only from rows with a valid result type
     if (item.resultType && item.resultType.trim() !== '') {
-      dateData.orders += item.results;
+      dateData.orders += Number(item.results) || 0;
     }
   });
   
   // Calculate derived metrics after summing all raw data for each date
-  Array.from(dateMap.values()).forEach(day => {
+  const result = Array.from(dateMap.values()).map(day => {
     // Safely calculate metrics to avoid division by zero
-    day.roas = day.spent > 0 ? day.sales / day.spent : 0;
-    day.ctr = day.impressions > 0 ? (day.clicks / day.impressions) * 100 : 0;
-    day.conversionRate = day.clicks > 0 ? (day.orders / day.clicks) * 100 : 0;
+    const roas = day.spent > 0 ? day.sales / day.spent : 0;
+    const ctr = day.impressions > 0 ? (day.clicks / day.impressions) * 100 : 0;
+    const conversionRate = day.clicks > 0 ? (day.orders / day.clicks) * 100 : 0;
+    const cpc = day.clicks > 0 ? day.spent / day.clicks : 0;
+    const costPerResult = day.orders > 0 ? day.spent / day.orders : 0;
+    
+    return {
+      ...day,
+      roas,
+      ctr,
+      conversionRate,
+      cpc,
+      costPerResult
+    };
   });
   
-  return Array.from(dateMap.values());
+  console.log(`Grouped ${data.length} records into ${result.length} dates`);
+  
+  // Log first date record for debugging
+  if (result.length > 0) {
+    console.log("Sample grouped date:", result[0]);
+  }
+  
+  return result;
 };
