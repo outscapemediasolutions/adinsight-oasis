@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import CampaignPerformanceChart from "@/components/dashboard/CampaignPerformanceChart";
 
 const DateRangePresets = [
   { label: "Today", value: "today" },
@@ -425,6 +426,22 @@ const Dashboard = () => {
     );
   }
   
+  const prepareCampaignChartData = () => {
+    if (!filteredData || filteredData.length === 0) return [];
+    
+    const campaignPerformance = getCampaignPerformance(filteredData);
+    
+    return campaignPerformance.map(campaign => ({
+      name: campaign.campaignName,
+      spend: campaign.metrics.spend,
+      sales: campaign.metrics.sales,
+      roas: campaign.metrics.roas,
+      conversionRate: campaign.metrics.conversionRate
+    }));
+  };
+  
+  const campaignChartData = prepareCampaignChartData();
+  
   return (
     <div className="space-y-6 font-poppins">
       <div className="flex items-center justify-between mb-4">
@@ -618,11 +635,8 @@ const Dashboard = () => {
                       <Skeleton className="h-[400px] w-full" />
                     ) : (
                       <div className="h-[400px]">
-                        <PerformanceChart
-                          title=""
-                          data={filteredData}
-                          type="campaign"
-                          height={400}
+                        <CampaignPerformanceChart
+                          data={campaignChartData}
                           isLoading={isLoading}
                         />
                       </div>
