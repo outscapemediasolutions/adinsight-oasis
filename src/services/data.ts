@@ -215,14 +215,23 @@ export const calculateMetrics = (data: AdData[]) => {
   let totalSpent = 0;
   let totalImpressions = 0;
   let totalClicks = 0;
+  let addsToCart = 0;
   
   data.forEach(item => {
     totalSales += item.purchasesValue;
-    totalOrders += item.purchases;
+    // Only count results as orders if the result type is "Purchases"
+    if (item.resultType.toLowerCase() === "purchases") {
+      totalOrders += item.results;
+    }
     totalVisitors += item.linkClicks;
     totalSpent += item.amountSpent;
     totalImpressions += item.impressions;
     totalClicks += item.linkClicks;
+    
+    // Add to cart tracking (default to 0 if not available)
+    if ('addsToCart' in item) {
+      addsToCart += (item as any).addsToCart || 0;
+    }
   });
   
   const roas = totalSpent > 0 ? totalSales / totalSpent : 0;
@@ -234,10 +243,12 @@ export const calculateMetrics = (data: AdData[]) => {
     totalSales,
     totalOrders,
     totalVisitors,
+    totalSpent,
     roas,
     ctr,
     cpc,
-    cpm
+    cpm,
+    addsToCart
   };
 };
 

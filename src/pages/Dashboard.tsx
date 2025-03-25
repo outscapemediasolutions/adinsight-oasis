@@ -549,13 +549,18 @@ const Dashboard = () => {
           
           <AnalyticsSummary 
             data={metrics ? {
-              totalSales: metrics.totalSales,
-              totalOrders: metrics.totalOrders,
-              totalVisitors: metrics.totalVisitors,
+              // First row metrics
+              amountSpent: metrics.totalSpent,
+              purchasesValue: metrics.totalSales,
               roas: metrics.roas,
-              ctr: metrics.ctr,
+              linkClicks: metrics.totalVisitors,
+              // Second row metrics
               cpc: metrics.cpc,
-              cpm: metrics.cpm
+              ctr: metrics.ctr,
+              cpm: metrics.cpm,
+              addsToCart: metrics.addsToCart || 0,
+              // Orders data
+              results: metrics.totalOrders
             } : undefined}
             isLoading={isLoading} 
           />

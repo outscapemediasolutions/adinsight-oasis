@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDownIcon, ArrowUpIcon, DollarSign, ShoppingCart, TrendingUp, Users } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, DollarSign, ShoppingCart, MousePointerClick, TrendingUp, Percent, Target, BarChart4 } from "lucide-react";
 
 interface StatCardProps {
   title: string;
@@ -41,26 +41,36 @@ const StatCard = ({ title, value, description, icon, trend, percentage }: StatCa
 
 interface AnalyticsSummaryProps {
   data?: {
-    totalSales: number;
-    totalOrders: number;
-    totalVisitors: number;
+    // First row metrics
+    amountSpent: number;
+    purchasesValue: number;
     roas: number;
-    ctr: number;
+    linkClicks: number;
+    // Second row metrics
     cpc: number;
+    ctr: number;
     cpm: number;
+    addsToCart: number;
+    // Orders data
+    results: number;
   };
   isLoading?: boolean;
 }
 
 const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) => {
   const placeholderData = {
-    totalSales: data?.totalSales || 0,
-    totalOrders: data?.totalOrders || 0,
-    totalVisitors: data?.totalVisitors || 0,
+    // First row metrics
+    amountSpent: data?.amountSpent || 0,
+    purchasesValue: data?.purchasesValue || 0,
     roas: data?.roas || 0,
-    ctr: data?.ctr || 0,
+    linkClicks: data?.linkClicks || 0,
+    // Second row metrics
     cpc: data?.cpc || 0,
-    cpm: data?.cpm || 0
+    ctr: data?.ctr || 0,
+    cpm: data?.cpm || 0,
+    addsToCart: data?.addsToCart || 0,
+    // Orders data
+    results: data?.results || 0
   };
 
   if (isLoading) {
@@ -81,40 +91,89 @@ const AnalyticsSummary = ({ data, isLoading = false }: AnalyticsSummaryProps) =>
     );
   }
 
+  // Format currency values
+  const formatCurrency = (value: number) => {
+    return `₹${value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  };
+
+  // Format percentage values
+  const formatPercentage = (value: number) => {
+    return `${value.toFixed(2)}%`;
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard
-        title="Revenue"
-        value={`₹${placeholderData.totalSales.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-        description="Purchase conversion value from ads"
-        icon={<DollarSign className="h-4 w-4" />}
-        trend="up"
-        percentage="12% from last period"
-      />
-      <StatCard
-        title="Orders"
-        value={placeholderData.totalOrders.toLocaleString()}
-        description="Total sales attributed to ads"
-        icon={<ShoppingCart className="h-4 w-4" />}
-        trend="up"
-        percentage="7% from last period"
-      />
-      <StatCard
-        title="Link Clicks"
-        value={placeholderData.totalVisitors.toLocaleString()}
-        description="Total clicks from all campaigns"
-        icon={<Users className="h-4 w-4" />}
-        trend="down"
-        percentage="3% from last period"
-      />
-      <StatCard
-        title="ROAS"
-        value={placeholderData.roas.toFixed(2) + "x"}
-        description="Return on ad spend"
-        icon={<TrendingUp className="h-4 w-4" />}
-        trend={placeholderData.roas > 1 ? "up" : "down"}
-        percentage={`${((placeholderData.roas - 1) * 100).toFixed(1)}% ROI`}
-      />
+    <div className="space-y-4">
+      {/* First Row - Primary Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Spends"
+          value={formatCurrency(placeholderData.amountSpent)}
+          description="Total ad spend"
+          icon={<DollarSign className="h-4 w-4" />}
+          trend="up"
+          percentage="8% from last period"
+        />
+        <StatCard
+          title="Sales"
+          value={formatCurrency(placeholderData.purchasesValue)}
+          description="Total revenue from ads"
+          icon={<ShoppingCart className="h-4 w-4" />}
+          trend="up"
+          percentage="12% from last period"
+        />
+        <StatCard
+          title="ROAS"
+          value={`${placeholderData.roas.toFixed(2)}x`}
+          description="Return on ad spend"
+          icon={<TrendingUp className="h-4 w-4" />}
+          trend={placeholderData.roas > 1 ? "up" : "down"}
+          percentage={`${((placeholderData.roas - 1) * 100).toFixed(1)}% ROI`}
+        />
+        <StatCard
+          title="Clicks"
+          value={placeholderData.linkClicks.toLocaleString()}
+          description="Total ad-driven clicks"
+          icon={<MousePointerClick className="h-4 w-4" />}
+          trend="down"
+          percentage="3% from last period"
+        />
+      </div>
+
+      {/* Second Row - Performance Efficiency Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="CPC"
+          value={formatCurrency(placeholderData.cpc)}
+          description="Average cost per click"
+          icon={<DollarSign className="h-4 w-4" />}
+          trend="down"
+          percentage="5% from last period"
+        />
+        <StatCard
+          title="CTR"
+          value={formatPercentage(placeholderData.ctr)}
+          description="Click-through rate"
+          icon={<Percent className="h-4 w-4" />}
+          trend="up"
+          percentage="2% from last period"
+        />
+        <StatCard
+          title="CPM"
+          value={formatCurrency(placeholderData.cpm)}
+          description="Cost per 1,000 impressions"
+          icon={<BarChart4 className="h-4 w-4" />}
+          trend="down"
+          percentage="4% from last period"
+        />
+        <StatCard
+          title="Add to Carts"
+          value={placeholderData.addsToCart.toLocaleString()}
+          description="Total add to cart actions driven by ads"
+          icon={<Target className="h-4 w-4" />}
+          trend="up"
+          percentage="10% from last period"
+        />
+      </div>
     </div>
   );
 };
