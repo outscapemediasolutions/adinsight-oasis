@@ -634,15 +634,15 @@ const Dashboard = () => {
             />
           </div>
           
-          <div className="mt-4">
+          <div className="mt-6">
             <Card className="bg-[#0B2537] border-white/10">
-              <CardHeader className="pb-1 pt-3 px-3">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-medium font-poppins">Campaign Performance</CardTitle>
                 <CardDescription>Compare performance across all campaigns</CardDescription>
               </CardHeader>
-              <CardContent className="px-2 pb-2 pt-0">
+              <CardContent>
                 <Tabs defaultValue="spend" className="w-full">
-                  <TabsList className="bg-[#021627]/50 mb-2">
+                  <TabsList className="bg-[#021627]/50 mb-4">
                     <TabsTrigger value="spend" className="font-poppins">Spend & Revenue</TabsTrigger>
                     <TabsTrigger value="conversion" className="font-poppins">Conversion Metrics</TabsTrigger>
                     <TabsTrigger value="engagement" className="font-poppins">Engagement</TabsTrigger>
@@ -650,9 +650,9 @@ const Dashboard = () => {
                   
                   <TabsContent value="spend" className="mt-0">
                     {isLoading ? (
-                      <Skeleton className="h-[350px] w-full" />
+                      <Skeleton className="h-[400px] w-full" />
                     ) : (
-                      <div className="h-[350px]">
+                      <div className="h-[400px]">
                         <CampaignPerformanceChart
                           data={campaignChartData}
                           isLoading={isLoading}
@@ -663,14 +663,14 @@ const Dashboard = () => {
                   
                   <TabsContent value="conversion" className="mt-0">
                     {isLoading ? (
-                      <Skeleton className="h-[350px] w-full" />
+                      <Skeleton className="h-[400px] w-full" />
                     ) : (
-                      <div className="h-[350px]">
+                      <div className="h-[400px]">
                         <PerformanceChart
                           title=""
                           data={filteredData}
                           type="cvr"
-                          height={350}
+                          height={400}
                           isLoading={isLoading}
                         />
                       </div>
@@ -679,14 +679,14 @@ const Dashboard = () => {
                   
                   <TabsContent value="engagement" className="mt-0">
                     {isLoading ? (
-                      <Skeleton className="h-[350px] w-full" />
+                      <Skeleton className="h-[400px] w-full" />
                     ) : (
-                      <div className="h-[350px]">
+                      <div className="h-[400px]">
                         <PerformanceChart
                           title=""
                           data={filteredData}
                           type="ctr"
-                          height={350}
+                          height={400}
                           isLoading={isLoading}
                         />
                       </div>

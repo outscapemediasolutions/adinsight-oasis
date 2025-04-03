@@ -15,8 +15,7 @@ import {
   Bar,
   ReferenceLine,
   AreaChart,
-  Area,
-  Cell
+  Area
 } from "recharts";
 import { format, parse } from "date-fns";
 import React, { useMemo } from "react";
@@ -49,25 +48,6 @@ const formatCurrency = (value: number) => {
 // Format percentage values
 const formatPercentage = (value: number) => {
   return `${value.toFixed(2)}%`;
-};
-
-// Helper to truncate campaign names for display
-const truncateName = (name: string, maxLength = 18) => {
-  return name.length > maxLength ? name.slice(0, maxLength) + '...' : name;
-};
-
-// Helper to determine color based on CTR value
-const getCTRColor = (ctr: number) => {
-  if (ctr >= 2) return "#6fe394"; // high - green
-  if (ctr >= 1) return "#ffcc00"; // medium - gold
-  return "#ff5252"; // low - red
-};
-
-// Helper to determine color based on CVR value
-const getCVRColor = (cvr: number) => {
-  if (cvr >= 3) return "#6fe394"; // high - green  
-  if (cvr >= 1.5) return "#ffcc00"; // medium - gold
-  return "#ff5252"; // low - red
 };
 
 const PerformanceChart = ({ 
@@ -106,7 +86,6 @@ const PerformanceChart = ({
         if (!campaignData.has(item.campaignName)) {
           campaignData.set(item.campaignName, {
             name: item.campaignName,
-            fullName: item.campaignName, // Store full name for tooltip
             impressions: 0,
             clicks: 0,
             results: 0,
@@ -136,15 +115,10 @@ const PerformanceChart = ({
       
       // Ensure at least one data point exists
       if (processedData.length === 0) {
-        return [{ name: 'No Data', fullName: 'No Data', ctr: 0, conversionRate: 0 }];
+        return [{ name: 'No Data', ctr: 0, conversionRate: 0 }];
       }
       
-      // Sort by CTR or Conversion Rate depending on the chart type
-      return processedData.sort((a, b) => {
-        return type === 'ctr' 
-          ? b.ctr - a.ctr 
-          : b.conversionRate - a.conversionRate;
-      });
+      return processedData;
     }
     
     // Default empty data
@@ -180,10 +154,7 @@ const PerformanceChart = ({
       case 'spendVsRevenue':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <AreaChart 
-              data={chartData} 
-              margin={{ top: 20, right: 30, left: 10, bottom: 40 }}
-            >
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
               <defs>
                 <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ff9800" stopOpacity={0.8} />
@@ -203,7 +174,6 @@ const PerformanceChart = ({
                 angle={45}
                 textAnchor="start"
                 height={60}
-                padding={{ left: 10, right: 10 }}
               />
               <YAxis 
                 yAxisId="left"
@@ -211,20 +181,18 @@ const PerformanceChart = ({
                 stroke="#e0f2f1"
                 tick={{ fill: '#e0f2f1', fontSize: 12 }}
                 axisLine={{ stroke: '#37474f' }}
-                padding={{ top: 10, bottom: 10 }}
               />
               <Tooltip 
                 formatter={(value: number, name: string) => [
                   formatCurrency(value), 
                   name === 'spent' ? 'Ad Spend' : 'Sales Revenue'
                 ]}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
-                labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
-                wrapperStyle={{ zIndex: 1000 }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                labelStyle={{ color: "#e0f2f1" }}
               />
               <Legend 
                 formatter={(value) => value === 'spent' ? 'Ad Spend' : 'Sales Revenue'} 
-                wrapperStyle={{ bottom: 0, paddingTop: "15px" }}
+                wrapperStyle={{ bottom: 0 }}
               />
               <Area 
                 type="monotone" 
@@ -255,10 +223,7 @@ const PerformanceChart = ({
       case 'roas':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <LineChart 
-              data={chartData} 
-              margin={{ top: 20, right: 30, left: 10, bottom: 40 }}
-            >
+            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
               <XAxis 
                 dataKey="formattedDate" 
@@ -268,7 +233,6 @@ const PerformanceChart = ({
                 angle={45}
                 textAnchor="start"
                 height={60}
-                padding={{ left: 10, right: 10 }}
               />
               <YAxis 
                 tickFormatter={(value) => `${value}x`}
@@ -276,15 +240,13 @@ const PerformanceChart = ({
                 stroke="#e0f2f1"
                 tick={{ fill: '#e0f2f1', fontSize: 12 }}
                 axisLine={{ stroke: '#37474f' }}
-                padding={{ top: 10, bottom: 10 }}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}x`, 'ROAS']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
-                labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
-                wrapperStyle={{ zIndex: 1000 }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                labelStyle={{ color: "#e0f2f1" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "15px" }} />
+              <Legend />
               <ReferenceLine 
                 y={3} 
                 stroke="#ffcc00" 
@@ -316,9 +278,7 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 15, right: 30, left: 160, bottom: 15 }}
-              barGap={8}
-              barSize={20}
+              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -328,7 +288,6 @@ const PerformanceChart = ({
                 stroke="#e0f2f1"
                 tick={{ fill: '#e0f2f1', fontSize: 12 }}
                 axisLine={{ stroke: '#37474f' }}
-                padding={{ left: 0, right: 10 }}
               />
               <YAxis 
                 type="category" 
@@ -336,30 +295,21 @@ const PerformanceChart = ({
                 stroke="#e0f2f1" 
                 tick={{ fill: '#e0f2f1', fontSize: 12 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={155}
-                tickMargin={5}
-                padding={{ top: 15, bottom: 15 }}
+                width={120}
+                tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'CTR']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
-                labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
-                labelFormatter={(name) => {
-                  const item = chartData.find(d => d.name === name);
-                  return item?.fullName || name;
-                }}
-                wrapperStyle={{ zIndex: 1000 }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                labelStyle={{ color: "#e0f2f1" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "10px" }} />
+              <Legend />
               <Bar 
                 dataKey="ctr" 
                 name="CTR" 
+                fill="#4dabf5"
                 isAnimationActive={true}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={getCTRColor(entry.ctr)} />
-                ))}
-              </Bar>
+              />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -370,9 +320,7 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 15, right: 30, left: 160, bottom: 15 }}
-              barGap={8}
-              barSize={20}
+              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -382,7 +330,6 @@ const PerformanceChart = ({
                 stroke="#e0f2f1"
                 tick={{ fill: '#e0f2f1', fontSize: 12 }}
                 axisLine={{ stroke: '#37474f' }}
-                padding={{ left: 0, right: 10 }}
               />
               <YAxis 
                 type="category" 
@@ -390,30 +337,21 @@ const PerformanceChart = ({
                 stroke="#e0f2f1" 
                 tick={{ fill: '#e0f2f1', fontSize: 12 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={155}
-                tickMargin={5}
-                padding={{ top: 15, bottom: 15 }}
+                width={120}
+                tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'Conversion Rate']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
-                labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
-                labelFormatter={(name) => {
-                  const item = chartData.find(d => d.name === name);
-                  return item?.fullName || name;
-                }}
-                wrapperStyle={{ zIndex: 1000 }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                labelStyle={{ color: "#e0f2f1" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "10px" }} />
+              <Legend />
               <Bar 
                 dataKey="conversionRate" 
                 name="Conversion Rate" 
+                fill="#6fe394"
                 isAnimationActive={true}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={getCVRColor(entry.conversionRate)} />
-                ))}
-              </Bar>
+              />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -421,10 +359,7 @@ const PerformanceChart = ({
       case 'cpcVsCpa':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <LineChart 
-              data={chartData} 
-              margin={{ top: 20, right: 30, left: 10, bottom: 40 }}
-            >
+            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
               <XAxis 
                 dataKey="formattedDate" 
@@ -434,7 +369,6 @@ const PerformanceChart = ({
                 angle={45}
                 textAnchor="start"
                 height={60}
-                padding={{ left: 10, right: 10 }}
               />
               <YAxis 
                 yAxisId="left"
@@ -442,18 +376,16 @@ const PerformanceChart = ({
                 stroke="#e0f2f1"
                 tick={{ fill: '#e0f2f1', fontSize: 12 }}
                 axisLine={{ stroke: '#37474f' }}
-                padding={{ top: 10, bottom: 10 }}
               />
               <Tooltip 
                 formatter={(value: number, name: string) => [
                   formatCurrency(value), 
                   name === 'cpc' ? 'Cost per Click' : 'Cost per Result'
                 ]}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
-                labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
-                wrapperStyle={{ zIndex: 1000 }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
+                labelStyle={{ color: "#e0f2f1" }}
               />
-              <Legend wrapperStyle={{ paddingTop: "15px" }} />
+              <Legend />
               <Line 
                 type="monotone" 
                 dataKey="cpc" 
@@ -488,12 +420,12 @@ const PerformanceChart = ({
   };
   
   return (
-    <Card className="bg-[#0B2537] border-white/10 h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-white text-lg">{title}</CardTitle>
+    <Card className="bg-[#0B2537] border-white/10">
+      <CardHeader>
+        <CardTitle className="text-white">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
-      <CardContent className="p-4">
+      <CardContent>
         {renderChart()}
       </CardContent>
     </Card>
