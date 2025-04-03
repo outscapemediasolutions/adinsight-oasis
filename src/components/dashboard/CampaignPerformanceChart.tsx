@@ -192,28 +192,28 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
 
   return (
     <Card className="bg-[#0B2537] border-white/10">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-white">
+      <CardHeader className="pb-1 pt-3 px-3">
+        <CardTitle className="flex items-center gap-2 text-white text-lg">
           Campaign Performance <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <Tabs defaultValue="roas">
-          <TabsList className="bg-[#021627]/50 mx-4 mt-2 mb-4 w-auto">
+          <TabsList className="bg-[#021627]/50 mx-3 mt-1 mb-2 w-auto">
             <TabsTrigger value="roas">ROAS</TabsTrigger>
             <TabsTrigger value="spend">Spend</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>
             <TabsTrigger value="conversion">Conversion</TabsTrigger>
           </TabsList>
-          <TabsContent value="roas" className="h-[320px] px-4 pt-0 pb-4">
+          <TabsContent value="roas" className="h-[320px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={sortedByRoas} 
-                    margin={{ top: 15, right: 20, left: 160, bottom: 25 }}
+                    margin={{ top: 5, right: 10, left: 150, bottom: 20 }}
                     barSize={20}
-                    barGap={8}
+                    barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
@@ -221,7 +221,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1" 
                       tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={60}
+                      height={50}
                     />
                     <YAxis 
                       tickFormatter={(value) => `${value}x`} 
@@ -229,10 +229,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1"
                       tick={{ fill: '#e0f2f1', fontSize: 12 }}
                       axisLine={{ stroke: '#37474f' }}
-                      padding={{ top: 15, bottom: 10 }}
+                      padding={{ top: 5, bottom: 5 }}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
+                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "5px" }}
                       formatter={(value: number) => [`${value.toFixed(2)}x`, "ROAS"]}
                       labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
@@ -248,21 +248,21 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                         <Cell key={`cell-${index}`} fill={getRoasColor(entry.roas)} />
                       ))}
                     </Bar>
-                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Legend wrapperStyle={{ paddingTop: "5px" }} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
           </TabsContent>
-          <TabsContent value="spend" className="h-[320px] px-4 pt-0 pb-4">
+          <TabsContent value="spend" className="h-[320px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={sortedBySpend} 
-                    margin={{ top: 15, right: 20, left: 160, bottom: 25 }}
+                    margin={{ top: 5, right: 10, left: 150, bottom: 20 }}
                     barSize={20}
-                    barGap={8}
+                    barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
@@ -270,7 +270,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1" 
                       tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={60}
+                      height={50}
                     />
                     <YAxis 
                       tickFormatter={(value) => `₹${value / 1000}k`} 
@@ -278,10 +278,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1"
                       tick={{ fill: '#e0f2f1', fontSize: 12 }}
                       axisLine={{ stroke: '#37474f' }}
-                      padding={{ top: 15, bottom: 10 }}
+                      padding={{ top: 5, bottom: 5 }}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
+                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "5px" }}
                       formatter={(value: number) => [`₹${value.toFixed(2)}`, "Ad Spend"]}
                       labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
@@ -297,21 +297,21 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                         <Cell key={`cell-${index}`} fill={colors.spend} />
                       ))}
                     </Bar>
-                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Legend wrapperStyle={{ paddingTop: "5px" }} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
           </TabsContent>
-          <TabsContent value="sales" className="h-[320px] px-4 pt-0 pb-4">
+          <TabsContent value="sales" className="h-[320px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={sortedBySales} 
-                    margin={{ top: 15, right: 20, left: 160, bottom: 25 }}
+                    margin={{ top: 5, right: 10, left: 150, bottom: 20 }}
                     barSize={20}
-                    barGap={8}
+                    barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
@@ -319,7 +319,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1" 
                       tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={60}
+                      height={50}
                     />
                     <YAxis 
                       tickFormatter={(value) => `₹${value / 1000}k`} 
@@ -327,10 +327,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1"
                       tick={{ fill: '#e0f2f1', fontSize: 12 }}
                       axisLine={{ stroke: '#37474f' }}
-                      padding={{ top: 15, bottom: 10 }}
+                      padding={{ top: 5, bottom: 5 }}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
+                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "5px" }}
                       formatter={(value: number) => [`₹${value.toFixed(2)}`, "Sales Revenue"]}
                       labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
@@ -346,21 +346,21 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                         <Cell key={`cell-${index}`} fill={colors.sales} />
                       ))}
                     </Bar>
-                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Legend wrapperStyle={{ paddingTop: "5px" }} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             )}
           </TabsContent>
-          <TabsContent value="conversion" className="h-[320px] px-4 pt-0 pb-4">
+          <TabsContent value="conversion" className="h-[320px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={sortedByConversion} 
-                    margin={{ top: 15, right: 20, left: 160, bottom: 25 }}
+                    margin={{ top: 5, right: 10, left: 150, bottom: 20 }}
                     barSize={20}
-                    barGap={8}
+                    barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
@@ -368,7 +368,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1" 
                       tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={60}
+                      height={50}
                     />
                     <YAxis 
                       tickFormatter={(value) => `${value.toFixed(2)}%`} 
@@ -376,10 +376,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                       stroke="#e0f2f1"
                       tick={{ fill: '#e0f2f1', fontSize: 12 }}
                       axisLine={{ stroke: '#37474f' }}
-                      padding={{ top: 15, bottom: 10 }}
+                      padding={{ top: 5, bottom: 5 }}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "10px" }}
+                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "5px" }}
                       formatter={(value: number) => [`${value.toFixed(2)}%`, "Conversion Rate"]}
                       labelStyle={{ color: "#e0f2f1", marginBottom: "5px" }}
                       labelFormatter={(label) => label} // Show full campaign name in tooltip
@@ -394,7 +394,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                         <Cell key={`cell-${index}`} fill={getConversionColor(entry.conversionRate || 0)} />
                       ))}
                     </Bar>
-                    <Legend wrapperStyle={{ paddingTop: "10px" }} />
+                    <Legend wrapperStyle={{ paddingTop: "5px" }} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
