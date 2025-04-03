@@ -128,11 +128,11 @@ const PerformanceChart = ({
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-1 pt-3">
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2">
           <Skeleton className="h-[300px] w-full" />
         </CardContent>
       </Card>
@@ -154,7 +154,7 @@ const PerformanceChart = ({
       case 'spendVsRevenue':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
+            <AreaChart data={chartData} margin={{ top: 0, right: 5, left: -10, bottom: 20 }}>
               <defs>
                 <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#ff9800" stopOpacity={0.8} />
@@ -169,30 +169,35 @@ const PerformanceChart = ({
               <XAxis 
                 dataKey="formattedDate" 
                 stroke="#e0f2f1" 
-                tick={{ fill: '#e0f2f1', fontSize: 12 }} 
+                tick={{ fill: '#e0f2f1', fontSize: 11 }} 
                 axisLine={{ stroke: '#37474f' }}
                 angle={45}
                 textAnchor="start"
-                height={60}
+                height={50}
+                tickSize={3}
+                tickMargin={3}
               />
               <YAxis 
                 yAxisId="left"
                 tickFormatter={(value) => `₹${value / 1000}k`}
                 stroke="#e0f2f1"
-                tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                tick={{ fill: '#e0f2f1', fontSize: 11 }}
                 axisLine={{ stroke: '#37474f' }}
+                tickSize={3}
+                tickMargin={2}
               />
               <Tooltip 
                 formatter={(value: number, name: string) => [
                   formatCurrency(value), 
                   name === 'spent' ? 'Ad Spend' : 'Sales Revenue'
                 ]}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
-                labelStyle={{ color: "#e0f2f1" }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
+                labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
+                cursor={{ stroke: '#37474f', strokeWidth: 1 }}
               />
               <Legend 
                 formatter={(value) => value === 'spent' ? 'Ad Spend' : 'Sales Revenue'} 
-                wrapperStyle={{ bottom: 0 }}
+                wrapperStyle={{ fontSize: 11, marginTop: -10 }}
               />
               <Area 
                 type="monotone" 
@@ -204,6 +209,7 @@ const PerformanceChart = ({
                 connectNulls={true}
                 isAnimationActive={true}
                 yAxisId="left"
+                activeDot={{ r: 4, stroke: '#ff9800', strokeWidth: 1 }}
               />
               <Area 
                 type="monotone" 
@@ -215,6 +221,7 @@ const PerformanceChart = ({
                 connectNulls={true}
                 isAnimationActive={true}
                 yAxisId="left"
+                activeDot={{ r: 4, stroke: '#6fe394', strokeWidth: 1 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -223,38 +230,44 @@ const PerformanceChart = ({
       case 'roas':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
+            <LineChart data={chartData} margin={{ top: 0, right: 5, left: -10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
               <XAxis 
                 dataKey="formattedDate" 
                 stroke="#e0f2f1" 
-                tick={{ fill: '#e0f2f1', fontSize: 12 }} 
+                tick={{ fill: '#e0f2f1', fontSize: 11 }} 
                 axisLine={{ stroke: '#37474f' }}
                 angle={45}
                 textAnchor="start"
-                height={60}
+                height={50}
+                tickSize={3}
+                tickMargin={3}
               />
               <YAxis 
                 tickFormatter={(value) => `${value}x`}
                 domain={[0, Math.max(...chartData.map(d => d.roas || 0)) * 1.2 || 4]}
                 stroke="#e0f2f1"
-                tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                tick={{ fill: '#e0f2f1', fontSize: 11 }}
                 axisLine={{ stroke: '#37474f' }}
+                tickSize={3}
+                tickMargin={2}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}x`, 'ROAS']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
-                labelStyle={{ color: "#e0f2f1" }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
+                labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
+                cursor={{ stroke: '#37474f', strokeWidth: 1 }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
               <ReferenceLine 
                 y={3} 
                 stroke="#ffcc00" 
                 strokeDasharray="3 3" 
                 label={{ 
-                  value: 'Target ROAS (3x)', 
+                  value: '3x', 
                   fill: '#ffcc00', 
-                  position: 'insideBottomRight' 
+                  position: 'insideBottomRight',
+                  fontSize: 10
                 }} 
               />
               <Line 
@@ -262,9 +275,9 @@ const PerformanceChart = ({
                 dataKey="roas" 
                 name="ROAS" 
                 stroke="#ffcc00" 
-                strokeWidth={3}
-                dot={{ fill: '#ffcc00', stroke: '#ffcc00', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
+                strokeWidth={2}
+                dot={{ fill: '#ffcc00', stroke: '#ffcc00', strokeWidth: 1, r: 3 }}
+                activeDot={{ r: 5 }}
                 connectNulls={true}
                 isAnimationActive={true}
               />
@@ -278,7 +291,7 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
+              margin={{ top: 0, right: 5, left: 110, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -286,29 +299,35 @@ const PerformanceChart = ({
                 tickFormatter={(value) => `${value.toFixed(1)}%`}
                 domain={[0, Math.max(...chartData.map(d => d.ctr || 0)) * 1.2 || 4]}
                 stroke="#e0f2f1"
-                tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                tick={{ fill: '#e0f2f1', fontSize: 11 }}
                 axisLine={{ stroke: '#37474f' }}
+                tickSize={3}
+                tickMargin={2}
               />
               <YAxis 
                 type="category" 
                 dataKey="name" 
                 stroke="#e0f2f1" 
-                tick={{ fill: '#e0f2f1', fontSize: 12 }} 
+                tick={{ fill: '#e0f2f1', fontSize: 11 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={120}
+                width={110}
+                tickSize={3}
                 tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'CTR']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
-                labelStyle={{ color: "#e0f2f1" }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
+                labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                labelFormatter={(label) => label} // Show full campaign name in tooltip
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11, marginTop: -5 }} />
               <Bar 
                 dataKey="ctr" 
                 name="CTR" 
                 fill="#4dabf5"
                 isAnimationActive={true}
+                barSize={20}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -320,7 +339,7 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
+              margin={{ top: 0, right: 5, left: 110, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -328,29 +347,35 @@ const PerformanceChart = ({
                 tickFormatter={(value) => `${value.toFixed(1)}%`}
                 domain={[0, Math.max(...chartData.map(d => d.conversionRate || 0)) * 1.2 || 4]}
                 stroke="#e0f2f1"
-                tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                tick={{ fill: '#e0f2f1', fontSize: 11 }}
                 axisLine={{ stroke: '#37474f' }}
+                tickSize={3}
+                tickMargin={2}
               />
               <YAxis 
                 type="category" 
                 dataKey="name" 
                 stroke="#e0f2f1" 
-                tick={{ fill: '#e0f2f1', fontSize: 12 }} 
+                tick={{ fill: '#e0f2f1', fontSize: 11 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={120}
+                width={110}
+                tickSize={3}
                 tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'Conversion Rate']}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
-                labelStyle={{ color: "#e0f2f1" }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
+                labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
+                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                labelFormatter={(label) => label} // Show full campaign name in tooltip
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11, marginTop: -5 }} />
               <Bar 
                 dataKey="conversionRate" 
                 name="Conversion Rate" 
                 fill="#6fe394"
                 isAnimationActive={true}
+                barSize={20}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -359,41 +384,46 @@ const PerformanceChart = ({
       case 'cpcVsCpa':
         return (
           <ResponsiveContainer width="100%" height={height}>
-            <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
+            <LineChart data={chartData} margin={{ top: 0, right: 5, left: -10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#37474f" />
               <XAxis 
                 dataKey="formattedDate" 
                 stroke="#e0f2f1" 
-                tick={{ fill: '#e0f2f1', fontSize: 12 }} 
+                tick={{ fill: '#e0f2f1', fontSize: 11 }} 
                 axisLine={{ stroke: '#37474f' }}
                 angle={45}
                 textAnchor="start"
-                height={60}
+                height={50}
+                tickSize={3}
+                tickMargin={3}
               />
               <YAxis 
                 yAxisId="left"
                 tickFormatter={formatCurrency}
                 stroke="#e0f2f1"
-                tick={{ fill: '#e0f2f1', fontSize: 12 }}
+                tick={{ fill: '#e0f2f1', fontSize: 11 }}
                 axisLine={{ stroke: '#37474f' }}
+                tickSize={3}
+                tickMargin={2}
               />
               <Tooltip 
                 formatter={(value: number, name: string) => [
                   formatCurrency(value), 
                   name === 'cpc' ? 'Cost per Click' : 'Cost per Result'
                 ]}
-                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
-                labelStyle={{ color: "#e0f2f1" }}
+                contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
+                labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
+                cursor={{ stroke: '#37474f', strokeWidth: 1 }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
               <Line 
                 type="monotone" 
                 dataKey="cpc" 
                 name="CPC" 
                 stroke="#4dabf5" 
                 strokeWidth={2}
-                dot={{ fill: '#4dabf5', stroke: '#4dabf5', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
+                dot={{ fill: '#4dabf5', stroke: '#4dabf5', strokeWidth: 1, r: 3 }}
+                activeDot={{ r: 5 }}
                 yAxisId="left"
                 connectNulls={true}
                 isAnimationActive={true}
@@ -404,8 +434,8 @@ const PerformanceChart = ({
                 name="CPA" 
                 stroke="#ff9800" 
                 strokeWidth={2}
-                dot={{ fill: '#ff9800', stroke: '#ff9800', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
+                dot={{ fill: '#ff9800', stroke: '#ff9800', strokeWidth: 1, r: 3 }}
+                activeDot={{ r: 5 }}
                 yAxisId="left"
                 connectNulls={true}
                 isAnimationActive={true}
@@ -421,11 +451,11 @@ const PerformanceChart = ({
   
   return (
     <Card className="bg-[#0B2537] border-white/10">
-      <CardHeader>
-        <CardTitle className="text-white">{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
+      <CardHeader className="pb-1 pt-3">
+        <CardTitle className="text-white text-base">{title}</CardTitle>
+        {description && <CardDescription className="text-xs">{description}</CardDescription>}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2">
         {renderChart()}
       </CardContent>
     </Card>

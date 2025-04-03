@@ -31,46 +31,46 @@ const PerformanceTable = ({ data, isLoading = false }: PerformanceTableProps) =>
 
   if (!data || data.length === 0) {
     return (
-      <div className="w-full rounded-md border p-8 text-center">
+      <div className="w-full rounded-md border p-4 text-center">
         <p className="text-muted-foreground">No data available to display</p>
       </div>
     );
   }
 
   return (
-    <Table>
-      <TableCaption>Recent campaign performance data</TableCaption>
+    <Table className="w-full">
+      <TableCaption className="mt-1 text-xs">Recent campaign performance data</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Campaign</TableHead>
-          <TableHead>Ad Set</TableHead>
-          <TableHead>Impressions</TableHead>
-          <TableHead>Clicks</TableHead>
-          <TableHead>CTR</TableHead>
-          <TableHead>CPM</TableHead>
-          <TableHead className="text-right">Amount Spent</TableHead>
+          <TableHead className="py-2">Date</TableHead>
+          <TableHead className="py-2">Campaign</TableHead>
+          <TableHead className="py-2">Ad Set</TableHead>
+          <TableHead className="py-2">Impressions</TableHead>
+          <TableHead className="py-2">Clicks</TableHead>
+          <TableHead className="py-2">CTR</TableHead>
+          <TableHead className="py-2">CPM</TableHead>
+          <TableHead className="py-2 text-right">Amount Spent</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {data.slice(0, 7).map((row, index) => (
           <TableRow key={index}>
-            <TableCell>{row.date}</TableCell>
-            <TableCell>
-              <div className="max-w-[120px]" title={row.campaignName}>
+            <TableCell className="py-1">{row.date}</TableCell>
+            <TableCell className="py-1">
+              <div className="max-w-[120px] text-sm truncate" title={row.campaignName}>
                 {formatChartLabel(row.campaignName)}
               </div>
             </TableCell>
-            <TableCell>
-              <div className="max-w-[120px]" title={row.adSetName}>
+            <TableCell className="py-1">
+              <div className="max-w-[120px] text-sm truncate" title={row.adSetName}>
                 {formatChartLabel(row.adSetName)}
               </div>
             </TableCell>
-            <TableCell>{row.impressions.toLocaleString()}</TableCell>
-            <TableCell>{row.linkClicks.toLocaleString()}</TableCell>
-            <TableCell>{(row.ctr * 100).toFixed(2)}%</TableCell>
-            <TableCell>₹{row.cpm.toFixed(2)}</TableCell>
-            <TableCell className="text-right">₹{row.amountSpent.toLocaleString()}</TableCell>
+            <TableCell className="py-1">{row.impressions.toLocaleString()}</TableCell>
+            <TableCell className="py-1">{row.linkClicks.toLocaleString()}</TableCell>
+            <TableCell className="py-1">{(row.ctr * 100).toFixed(2)}%</TableCell>
+            <TableCell className="py-1">₹{row.cpm.toFixed(2)}</TableCell>
+            <TableCell className="py-1 text-right">₹{row.amountSpent.toLocaleString()}</TableCell>
           </TableRow>
         ))}
       </TableBody>
