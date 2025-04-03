@@ -15,7 +15,8 @@ import {
   Bar,
   ReferenceLine,
   AreaChart,
-  Area
+  Area,
+  Cell
 } from "recharts";
 import { format, parse } from "date-fns";
 import React, { useMemo } from "react";
@@ -48,6 +49,25 @@ const formatCurrency = (value: number) => {
 // Format percentage values
 const formatPercentage = (value: number) => {
   return `${value.toFixed(2)}%`;
+};
+
+// Helper to truncate campaign names for display
+const truncateName = (name: string, maxLength = 18) => {
+  return name.length > maxLength ? name.slice(0, maxLength) + '...' : name;
+};
+
+// Helper to determine color based on CTR value
+const getCTRColor = (ctr: number) => {
+  if (ctr >= 2) return "#6fe394"; // high - green
+  if (ctr >= 1) return "#ffcc00"; // medium - gold
+  return "#ff5252"; // low - red
+};
+
+// Helper to determine color based on CVR value
+const getCVRColor = (cvr: number) => {
+  if (cvr >= 3) return "#6fe394"; // high - green  
+  if (cvr >= 1.5) return "#ffcc00"; // medium - gold
+  return "#ff5252"; // low - red
 };
 
 const PerformanceChart = ({ 
@@ -86,6 +106,7 @@ const PerformanceChart = ({
         if (!campaignData.has(item.campaignName)) {
           campaignData.set(item.campaignName, {
             name: item.campaignName,
+            fullName: item.campaignName, // Store full name for tooltip
             impressions: 0,
             clicks: 0,
             results: 0,
@@ -115,10 +136,15 @@ const PerformanceChart = ({
       
       // Ensure at least one data point exists
       if (processedData.length === 0) {
-        return [{ name: 'No Data', ctr: 0, conversionRate: 0 }];
+        return [{ name: 'No Data', fullName: 'No Data', ctr: 0, conversionRate: 0 }];
       }
       
-      return processedData;
+      // Sort by CTR or Conversion Rate depending on the chart type
+      return processedData.sort((a, b) => {
+        return type === 'ctr' 
+          ? b.ctr - a.ctr 
+          : b.conversionRate - a.conversionRate;
+      });
     }
     
     // Default empty data
@@ -278,7 +304,9 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
+              margin={{ top: 10, right: 30, left: 150, bottom: 5 }}
+              barGap={8}
+              barSize={20}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -295,21 +323,28 @@ const PerformanceChart = ({
                 stroke="#e0f2f1" 
                 tick={{ fill: '#e0f2f1', fontSize: 12 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={120}
-                tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
+                width={150}
+                tickMargin={5}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'CTR']}
                 contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
                 labelStyle={{ color: "#e0f2f1" }}
+                labelFormatter={(name) => {
+                  const item = chartData.find(d => d.name === name);
+                  return item?.fullName || name;
+                }}
               />
               <Legend />
               <Bar 
                 dataKey="ctr" 
                 name="CTR" 
-                fill="#4dabf5"
                 isAnimationActive={true}
-              />
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={getCTRColor(entry.ctr)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         );
@@ -320,7 +355,9 @@ const PerformanceChart = ({
             <BarChart 
               data={chartData} 
               layout="vertical"
-              margin={{ top: 10, right: 30, left: 120, bottom: 5 }}
+              margin={{ top: 10, right: 30, left: 150, bottom: 5 }}
+              barGap={8}
+              barSize={20}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#37474f" />
               <XAxis 
@@ -337,21 +374,28 @@ const PerformanceChart = ({
                 stroke="#e0f2f1" 
                 tick={{ fill: '#e0f2f1', fontSize: 12 }} 
                 axisLine={{ stroke: '#37474f' }}
-                width={120}
-                tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
+                width={150}
+                tickMargin={5}
               />
               <Tooltip 
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'Conversion Rate']}
                 contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px" }}
                 labelStyle={{ color: "#e0f2f1" }}
+                labelFormatter={(name) => {
+                  const item = chartData.find(d => d.name === name);
+                  return item?.fullName || name;
+                }}
               />
               <Legend />
               <Bar 
                 dataKey="conversionRate" 
                 name="Conversion Rate" 
-                fill="#6fe394"
                 isAnimationActive={true}
-              />
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={getCVRColor(entry.conversionRate)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         );

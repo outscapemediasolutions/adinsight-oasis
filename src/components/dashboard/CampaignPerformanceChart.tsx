@@ -89,6 +89,19 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     sales: "#6fe394",
     conversion: "#4dabf5"
   };
+
+  // Helper functions for color coding
+  const getRoasColor = (roas: number) => {
+    if (roas >= 3) return "#6fe394"; // high - green
+    if (roas >= 2) return "#ffcc00"; // medium - gold
+    return "#ff5252"; // low - red
+  };
+
+  const getConversionColor = (cvr: number) => {
+    if (cvr >= 3) return "#6fe394"; // high - green
+    if (cvr >= 1.5) return "#ffcc00"; // medium - gold
+    return "#ff5252"; // low - red
+  };
   
   const gradientColors = {
     roas: ["rgba(255, 204, 0, 0.8)", "rgba(255, 204, 0, 0.1)"],
@@ -196,7 +209,12 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedByRoas} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                  <BarChart 
+                    data={sortedByRoas} 
+                    margin={{ top: 5, right: 20, left: 150, bottom: 25 }}
+                    barSize={20}
+                    barGap={8}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
@@ -222,11 +240,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                     <Bar 
                       dataKey="roas" 
                       name="ROAS" 
-                      fill={colors.roas}
                       isAnimationActive={true}
                     >
                       {sortedByRoas.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.roas} />
+                        <Cell key={`cell-${index}`} fill={getRoasColor(entry.roas)} />
                       ))}
                     </Bar>
                     <Legend />
@@ -239,7 +256,12 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedBySpend} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                  <BarChart 
+                    data={sortedBySpend} 
+                    margin={{ top: 5, right: 20, left: 150, bottom: 25 }}
+                    barSize={20}
+                    barGap={8}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
@@ -281,7 +303,12 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedBySales} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                  <BarChart 
+                    data={sortedBySales} 
+                    margin={{ top: 5, right: 20, left: 150, bottom: 25 }}
+                    barSize={20}
+                    barGap={8}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
@@ -323,7 +350,12 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
             {!hasData ? noDataMessage : (
               <ChartContainer config={chartConfig}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedByConversion} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                  <BarChart 
+                    data={sortedByConversion} 
+                    margin={{ top: 5, right: 20, left: 150, bottom: 25 }}
+                    barSize={20}
+                    barGap={8}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
@@ -348,11 +380,10 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
                     <Bar 
                       dataKey="conversionRate" 
                       name="Conversion Rate" 
-                      fill={colors.conversion}
                       isAnimationActive={true}
                     >
                       {sortedByConversion.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.conversion} />
+                        <Cell key={`cell-${index}`} fill={getConversionColor(entry.conversionRate || 0)} />
                       ))}
                     </Bar>
                     <Legend />
