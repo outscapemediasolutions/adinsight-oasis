@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -97,9 +96,30 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     conversion: ["rgba(77, 171, 245, 0.8)", "rgba(77, 171, 245, 0.1)"]
   };
 
-  // Function to truncate campaign names for display
-  const truncateName = (name: string, maxLength = 15) => {
-    return name.length > maxLength ? name.slice(0, maxLength) + '...' : name;
+  // Improved campaign name formatting function
+  const formatCampaignName = (name: string) => {
+    if (!name) return "";
+    
+    // Split the campaign name by common separators
+    const parts = name.split(/\s*\|\s*/);
+    
+    if (parts.length > 1) {
+      // If we have multiple parts, format them nicely
+      // Keep the first part as brand/campaign identifier
+      const brand = parts[0].trim();
+      // Get the type (CBO, ABO, etc.)
+      const type = parts[1]?.trim() || "";
+      // Get first letter or two of the rest
+      const suffix = parts[2]?.trim().substring(0, 2) || "";
+      
+      return `${brand} | ${type} | ${suffix}...`;
+    }
+    
+    // If short enough, return as is
+    if (name.length <= 15) return name;
+    
+    // Otherwise truncate
+    return name.substring(0, 13) + "...";
   };
 
   if (isLoading) {
@@ -171,7 +191,7 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
           transform="rotate(-45)"
           fontSize={12}
         >
-          {truncateName(payload.value)}
+          {formatCampaignName(payload.value)}
         </text>
       </g>
     );

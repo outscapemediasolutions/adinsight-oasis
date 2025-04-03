@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AdData } from "@/services/data";
+import { formatChartLabel } from "@/components/ui/chart";
 
 interface PerformanceTableProps {
   data: AdData[];
@@ -55,8 +56,16 @@ const PerformanceTable = ({ data, isLoading = false }: PerformanceTableProps) =>
         {data.slice(0, 7).map((row, index) => (
           <TableRow key={index}>
             <TableCell>{row.date}</TableCell>
-            <TableCell>{row.campaignName}</TableCell>
-            <TableCell>{row.adSetName}</TableCell>
+            <TableCell>
+              <div className="max-w-[120px]" title={row.campaignName}>
+                {formatChartLabel(row.campaignName)}
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="max-w-[120px]" title={row.adSetName}>
+                {formatChartLabel(row.adSetName)}
+              </div>
+            </TableCell>
             <TableCell>{row.impressions.toLocaleString()}</TableCell>
             <TableCell>{row.linkClicks.toLocaleString()}</TableCell>
             <TableCell>{(row.ctr * 100).toFixed(2)}%</TableCell>

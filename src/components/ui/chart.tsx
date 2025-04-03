@@ -32,6 +32,32 @@ function useChart() {
   return context
 }
 
+// Utility function to format campaign/ad set names for better display
+export const formatChartLabel = (name: string, maxLength = 15) => {
+  if (!name) return "";
+  
+  // Split the campaign name by common separators
+  const parts = name.split(/\s*\|\s*/);
+  
+  if (parts.length > 1) {
+    // If we have multiple parts, format them nicely
+    // Keep the first part as brand/campaign identifier
+    const brand = parts[0].trim();
+    // Get the type (CBO, ABO, etc.)
+    const type = parts[1]?.trim() || "";
+    // Get first letter or two of the rest
+    const suffix = parts[2]?.trim().substring(0, 2) || "";
+    
+    return `${brand} | ${type} | ${suffix}...`;
+  }
+  
+  // If short enough, return as is
+  if (name.length <= maxLength) return name;
+  
+  // Otherwise truncate
+  return name.substring(0, maxLength - 2) + "...";
+};
+
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
