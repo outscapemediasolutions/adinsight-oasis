@@ -230,7 +230,7 @@ const Analytics = () => {
                   <PerformanceChart
                     title=""
                     data={filteredData}
-                    type="roas"
+                    type="campaign"
                     height={300}
                     isLoading={isLoading}
                   />
@@ -280,7 +280,7 @@ const Analytics = () => {
                   <PerformanceChart
                     title=""
                     data={filteredData}
-                    type="spendVsRevenue"
+                    type="campaign"
                     height={300}
                     isLoading={isLoading}
                   />
