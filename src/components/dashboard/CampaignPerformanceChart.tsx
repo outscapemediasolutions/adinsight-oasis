@@ -1,11 +1,12 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent
+  ChartTooltipContent,
+  formatChartLabel
 } from "@/components/ui/chart";
 import { 
   BarChart, 
@@ -19,9 +20,12 @@ import {
   Area, 
   Tooltip,
   ReferenceLine,
-  Legend
+  Legend,
+  LineChart,
+  Line
 } from "recharts";
 import { ArrowUpDown } from "lucide-react";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CampaignData {
   name: string;
@@ -37,6 +41,7 @@ interface CampaignPerformanceChartProps {
 }
 
 const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerformanceChartProps) => {
+  const [activeTab, setActiveTab] = useState('roas');
   console.log("CampaignPerformanceChart received data:", data);
   
   // Use the data passed in or fall back to placeholder data if none provided
@@ -62,24 +67,28 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     ? [...validatedChartData]
         .filter(item => item && item.roas !== undefined) // Filter out undefined ROAS
         .sort((a, b) => (b.roas || 0) - (a.roas || 0))
+        .slice(0, 10) // Limit to top 10
     : validatedChartData;
     
   const sortedBySpend = data
     ? [...validatedChartData]
         .filter(item => item && item.spend !== undefined) // Filter out undefined spend
         .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+        .slice(0, 10) // Limit to top 10
     : validatedChartData;
     
   const sortedBySales = data
     ? [...validatedChartData]
         .filter(item => item && item.sales !== undefined) // Filter out undefined sales
         .sort((a, b) => (b.sales || 0) - (a.sales || 0))
+        .slice(0, 10) // Limit to top 10
     : validatedChartData;
 
   const sortedByConversion = data
     ? [...validatedChartData]
         .filter(item => item && item.conversionRate !== undefined) // Filter out undefined conversion rate
         .sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0))
+        .slice(0, 10) // Limit to top 10
     : validatedChartData;
 
   // Updated color palette with higher visibility
@@ -97,30 +106,27 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     conversion: ["rgba(77, 171, 245, 0.8)", "rgba(77, 171, 245, 0.1)"]
   };
 
-  // Improved campaign name formatting function
-  const formatCampaignName = (name: string) => {
-    if (!name) return "";
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
     
-    // Split the campaign name by common separators
-    const parts = name.split(/\s*\|\s*/);
-    
-    if (parts.length > 1) {
-      // If we have multiple parts, format them nicely
-      // Keep the first part as brand/campaign identifier
-      const brand = parts[0].trim();
-      // Get the type (CBO, ABO, etc.)
-      const type = parts[1]?.trim() || "";
-      // Get first letter or two of the rest
-      const suffix = parts[2]?.trim().substring(0, 2) || "";
-      
-      return `${brand} | ${type} | ${suffix}...`;
-    }
-    
-    // If short enough, return as is
-    if (name.length <= 15) return name;
-    
-    // Otherwise truncate
-    return name.substring(0, 13) + "...";
+    return (
+      <div className="bg-[#0B2537] border border-white/10 rounded-md p-2 shadow-lg text-xs max-w-[240px]">
+        <p className="font-medium mb-1 break-words">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex justify-between items-center gap-2 mb-1">
+            <span style={{ color: entry.color }}>{entry.name}:</span>
+            <span className="font-mono">
+              {entry.name === 'ROAS'
+                ? `${entry.value.toFixed(2)}x`
+                : entry.name === 'Conversion Rate'
+                  ? `${entry.value.toFixed(2)}%`
+                  : `₹${entry.value.toLocaleString()}`}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -178,26 +184,6 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
     </div>
   );
 
-  // Function to render the x-axis labels with rotation and truncation
-  const renderCustomAxisTick = (props: any) => {
-    const { x, y, payload } = props;
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text 
-          x={0} 
-          y={0} 
-          dy={14} 
-          textAnchor="end" 
-          fill="#e0f2f1" 
-          transform="rotate(-45)"
-          fontSize={11}
-        >
-          {formatCampaignName(payload.value)}
-        </text>
-      </g>
-    );
-  };
-
   return (
     <Card className="bg-[#0B2537] border-white/10">
       <CardHeader className="pb-0 pt-3">
@@ -206,204 +192,301 @@ const CampaignPerformanceChart = ({ data, isLoading = false }: CampaignPerforman
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue="roas">
+        <Tabs defaultValue="roas" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-[#021627]/50 mx-3 my-2 w-auto h-8">
             <TabsTrigger value="roas" className="text-xs py-0 px-3">ROAS</TabsTrigger>
             <TabsTrigger value="spend" className="text-xs py-0 px-3">Spend</TabsTrigger>
             <TabsTrigger value="sales" className="text-xs py-0 px-3">Sales</TabsTrigger>
             <TabsTrigger value="conversion" className="text-xs py-0 px-3">Conversion</TabsTrigger>
           </TabsList>
+          
           <TabsContent value="roas" className="h-[300px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
-              <ChartContainer config={chartConfig}>
+              <TooltipProvider>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedByRoas} margin={{ top: 0, right: 5, left: -10, bottom: 25 }}>
+                  <BarChart data={sortedByRoas} margin={{ top: 0, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={50}
-                      tickSize={3}
-                      tickMargin={3}
+                      height={60}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      tick={(props) => {
+                        const { x, y, payload } = props;
+                        const formattedName = formatChartLabel(payload.value);
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <text 
+                                  x={0} 
+                                  y={0} 
+                                  dy={8} 
+                                  textAnchor="end" 
+                                  fill="#e0f2f1" 
+                                  transform="rotate(-45)"
+                                  fontSize={10}
+                                  className="cursor-help"
+                                >
+                                  {formattedName}
+                                </text>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[300px] text-xs">
+                                <p>{payload.value}</p>
+                              </TooltipContent>
+                            </UITooltip>
+                          </g>
+                        );
+                      }}
                     />
                     <YAxis 
-                      tickFormatter={(value) => `${value}x`} 
-                      domain={[0, Math.max(...sortedByRoas.map(item => item.roas || 0)) * 1.2 || 5]} 
+                      tickFormatter={(value) => `${value.toFixed(1)}x`} 
+                      domain={[0, Math.max(...sortedByRoas.map(item => item.roas || 0)) * 1.1 || 5]} 
                       stroke="#e0f2f1"
-                      tick={{ fill: '#e0f2f1', fontSize: 11 }}
+                      tick={{ fill: '#e0f2f1', fontSize: 10 }}
                       axisLine={{ stroke: '#37474f' }}
                       tickSize={3}
                       tickMargin={2}
+                      width={30}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
-                      formatter={(value: number) => [`${value.toFixed(2)}x`, "ROAS"]}
-                      labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
-                      labelFormatter={(label) => label} // Show full campaign name in tooltip
-                      cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                    />
-                    <ReferenceLine y={3} stroke="#ffcc00" strokeDasharray="3 3" label={{ value: "3x", fill: "#ffcc00", position: "insideBottomRight", fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={3} stroke="#ffcc00" strokeDasharray="3 3" label={{ 
+                      value: "3x", 
+                      fill: "#ffcc00", 
+                      position: "insideBottomRight", 
+                      fontSize: 10 
+                    }} />
                     <Bar 
                       dataKey="roas" 
                       name="ROAS" 
                       fill={colors.roas}
                       isAnimationActive={true}
-                      barSize={25}
-                    >
-                      {sortedByRoas.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.roas} />
-                      ))}
-                    </Bar>
-                    <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
+                      barSize={22}
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Legend 
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 0 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </TooltipProvider>
             )}
           </TabsContent>
+          
           <TabsContent value="spend" className="h-[300px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
-              <ChartContainer config={chartConfig}>
+              <TooltipProvider>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedBySpend} margin={{ top: 0, right: 5, left: -10, bottom: 25 }}>
+                  <BarChart data={sortedBySpend} margin={{ top: 0, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={50}
-                      tickSize={3}
-                      tickMargin={3}
+                      height={60}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      tick={(props) => {
+                        const { x, y, payload } = props;
+                        const formattedName = formatChartLabel(payload.value);
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <text 
+                                  x={0} 
+                                  y={0} 
+                                  dy={8} 
+                                  textAnchor="end" 
+                                  fill="#e0f2f1" 
+                                  transform="rotate(-45)"
+                                  fontSize={10}
+                                  className="cursor-help"
+                                >
+                                  {formattedName}
+                                </text>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[300px] text-xs">
+                                <p>{payload.value}</p>
+                              </TooltipContent>
+                            </UITooltip>
+                          </g>
+                        );
+                      }}
                     />
                     <YAxis 
-                      tickFormatter={(value) => `₹${value / 1000}k`} 
-                      domain={[0, Math.max(...sortedBySpend.map(item => item.spend || 0)) * 1.2 || 20000]} 
+                      tickFormatter={(value) => `₹${value/1000}k`} 
+                      domain={[0, Math.max(...sortedBySpend.map(item => item.spend || 0)) * 1.1 || 20000]} 
                       stroke="#e0f2f1"
-                      tick={{ fill: '#e0f2f1', fontSize: 11 }}
+                      tick={{ fill: '#e0f2f1', fontSize: 10 }}
                       axisLine={{ stroke: '#37474f' }}
                       tickSize={3}
                       tickMargin={2}
+                      width={40}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
-                      formatter={(value: number) => [`₹${value.toFixed(2)}`, "Ad Spend"]}
-                      labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
-                      labelFormatter={(label) => label} // Show full campaign name in tooltip
-                      cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar 
                       dataKey="spend" 
                       name="Ad Spend" 
                       fill={colors.spend}
                       isAnimationActive={true}
-                      barSize={25}
-                    >
-                      {sortedBySpend.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.spend} />
-                      ))}
-                    </Bar>
-                    <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
+                      barSize={22}
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Legend 
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 0 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </TooltipProvider>
             )}
           </TabsContent>
+          
           <TabsContent value="sales" className="h-[300px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
-              <ChartContainer config={chartConfig}>
+              <TooltipProvider>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedBySales} margin={{ top: 0, right: 5, left: -10, bottom: 25 }}>
+                  <BarChart data={sortedBySales} margin={{ top: 0, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={50}
-                      tickSize={3}
-                      tickMargin={3}
+                      height={60}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      tick={(props) => {
+                        const { x, y, payload } = props;
+                        const formattedName = formatChartLabel(payload.value);
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <text 
+                                  x={0} 
+                                  y={0} 
+                                  dy={8} 
+                                  textAnchor="end" 
+                                  fill="#e0f2f1" 
+                                  transform="rotate(-45)"
+                                  fontSize={10}
+                                  className="cursor-help"
+                                >
+                                  {formattedName}
+                                </text>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[300px] text-xs">
+                                <p>{payload.value}</p>
+                              </TooltipContent>
+                            </UITooltip>
+                          </g>
+                        );
+                      }}
                     />
                     <YAxis 
-                      tickFormatter={(value) => `₹${value / 1000}k`} 
-                      domain={[0, Math.max(...sortedBySales.map(item => item.sales || 0)) * 1.2 || 40000]} 
+                      tickFormatter={(value) => `₹${value/1000}k`} 
+                      domain={[0, Math.max(...sortedBySales.map(item => item.sales || 0)) * 1.1 || 40000]} 
                       stroke="#e0f2f1"
-                      tick={{ fill: '#e0f2f1', fontSize: 11 }}
+                      tick={{ fill: '#e0f2f1', fontSize: 10 }}
                       axisLine={{ stroke: '#37474f' }}
                       tickSize={3}
                       tickMargin={2}
+                      width={40}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
-                      formatter={(value: number) => [`₹${value.toFixed(2)}`, "Sales Revenue"]}
-                      labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
-                      labelFormatter={(label) => label} // Show full campaign name in tooltip
-                      cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar 
                       dataKey="sales" 
                       name="Sales Revenue" 
                       fill={colors.sales}
                       isAnimationActive={true}
-                      barSize={25}
-                    >
-                      {sortedBySales.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.sales} />
-                      ))}
-                    </Bar>
-                    <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
+                      barSize={22}
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Legend 
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 0 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </TooltipProvider>
             )}
           </TabsContent>
+          
           <TabsContent value="conversion" className="h-[300px] px-2 pt-0 pb-2">
             {!hasData ? noDataMessage : (
-              <ChartContainer config={chartConfig}>
+              <TooltipProvider>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sortedByConversion} margin={{ top: 0, right: 5, left: -10, bottom: 25 }}>
+                  <BarChart data={sortedByConversion} margin={{ top: 0, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#37474f" />
                     <XAxis 
                       dataKey="name" 
                       stroke="#e0f2f1" 
-                      tick={renderCustomAxisTick}
                       axisLine={{ stroke: '#37474f' }}
-                      height={50}
-                      tickSize={3}
-                      tickMargin={3}
+                      height={60}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      tick={(props) => {
+                        const { x, y, payload } = props;
+                        const formattedName = formatChartLabel(payload.value);
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <UITooltip>
+                              <TooltipTrigger asChild>
+                                <text 
+                                  x={0} 
+                                  y={0} 
+                                  dy={8} 
+                                  textAnchor="end" 
+                                  fill="#e0f2f1" 
+                                  transform="rotate(-45)"
+                                  fontSize={10}
+                                  className="cursor-help"
+                                >
+                                  {formattedName}
+                                </text>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[300px] text-xs">
+                                <p>{payload.value}</p>
+                              </TooltipContent>
+                            </UITooltip>
+                          </g>
+                        );
+                      }}
                     />
                     <YAxis 
-                      tickFormatter={(value) => `${value.toFixed(2)}%`} 
-                      domain={[0, Math.max(...sortedByConversion.map(item => item.conversionRate || 0)) * 1.2 || 5]} 
+                      tickFormatter={(value) => `${value.toFixed(1)}%`} 
+                      domain={[0, Math.max(...sortedByConversion.map(item => item.conversionRate || 0)) * 1.1 || 5]} 
                       stroke="#e0f2f1"
-                      tick={{ fill: '#e0f2f1', fontSize: 11 }}
+                      tick={{ fill: '#e0f2f1', fontSize: 10 }}
                       axisLine={{ stroke: '#37474f' }}
                       tickSize={3}
                       tickMargin={2}
+                      width={30}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e2a38", border: "1px solid #37474f", borderRadius: "4px", padding: "4px 8px" }}
-                      formatter={(value: number) => [`${value.toFixed(2)}%`, "Conversion Rate"]}
-                      labelStyle={{ color: "#e0f2f1", marginBottom: "2px" }}
-                      labelFormatter={(label) => label} // Show full campaign name in tooltip
-                      cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar 
                       dataKey="conversionRate" 
                       name="Conversion Rate" 
                       fill={colors.conversion}
                       isAnimationActive={true}
-                      barSize={25}
-                    >
-                      {sortedByConversion.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors.conversion} />
-                      ))}
-                    </Bar>
-                    <Legend wrapperStyle={{ fontSize: 11, marginTop: -10 }} />
+                      barSize={22}
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Legend 
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, paddingTop: 0 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-              </ChartContainer>
+              </TooltipProvider>
             )}
           </TabsContent>
         </Tabs>

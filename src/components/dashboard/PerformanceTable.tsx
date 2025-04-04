@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { AdData } from "@/services/data";
 import { formatChartLabel } from "@/components/ui/chart";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PerformanceTableProps {
   data: AdData[];
@@ -37,44 +38,77 @@ const PerformanceTable = ({ data, isLoading = false }: PerformanceTableProps) =>
     );
   }
 
+  // Format value based on type
+  const formatValue = (value: number, type: 'ctr' | 'cpm' | 'money' | 'number') => {
+    switch (type) {
+      case 'ctr':
+        return `${(value * 100).toFixed(2)}%`;
+      case 'cpm':
+        return `₹${value.toFixed(2)}`;
+      case 'money':
+        return `₹${value.toLocaleString()}`;
+      case 'number':
+      default:
+        return value.toLocaleString();
+    }
+  };
+
   return (
-    <Table className="w-full">
-      <TableCaption className="mt-1 text-xs">Recent campaign performance data</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="py-2">Date</TableHead>
-          <TableHead className="py-2">Campaign</TableHead>
-          <TableHead className="py-2">Ad Set</TableHead>
-          <TableHead className="py-2">Impressions</TableHead>
-          <TableHead className="py-2">Clicks</TableHead>
-          <TableHead className="py-2">CTR</TableHead>
-          <TableHead className="py-2">CPM</TableHead>
-          <TableHead className="py-2 text-right">Amount Spent</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.slice(0, 7).map((row, index) => (
-          <TableRow key={index}>
-            <TableCell className="py-1">{row.date}</TableCell>
-            <TableCell className="py-1">
-              <div className="max-w-[120px] text-sm truncate" title={row.campaignName}>
-                {formatChartLabel(row.campaignName)}
-              </div>
-            </TableCell>
-            <TableCell className="py-1">
-              <div className="max-w-[120px] text-sm truncate" title={row.adSetName}>
-                {formatChartLabel(row.adSetName)}
-              </div>
-            </TableCell>
-            <TableCell className="py-1">{row.impressions.toLocaleString()}</TableCell>
-            <TableCell className="py-1">{row.linkClicks.toLocaleString()}</TableCell>
-            <TableCell className="py-1">{(row.ctr * 100).toFixed(2)}%</TableCell>
-            <TableCell className="py-1">₹{row.cpm.toFixed(2)}</TableCell>
-            <TableCell className="py-1 text-right">₹{row.amountSpent.toLocaleString()}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <TooltipProvider>
+      <div className="overflow-x-auto -mx-1">
+        <Table className="w-full">
+          <TableCaption className="mt-1 text-xs">Recent campaign performance data</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="py-1.5 text-xs">Date</TableHead>
+              <TableHead className="py-1.5 text-xs">Campaign</TableHead>
+              <TableHead className="py-1.5 text-xs">Ad Set</TableHead>
+              <TableHead className="py-1.5 text-xs text-right">Impressions</TableHead>
+              <TableHead className="py-1.5 text-xs text-right">Clicks</TableHead>
+              <TableHead className="py-1.5 text-xs text-right">CTR</TableHead>
+              <TableHead className="py-1.5 text-xs text-right">CPM</TableHead>
+              <TableHead className="py-1.5 text-xs text-right">Spent</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.slice(0, 7).map((row, index) => (
+              <TableRow key={index} className="group hover:bg-white/5">
+                <TableCell className="py-1 text-xs">{row.date}</TableCell>
+                <TableCell className="py-1 text-xs">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="max-w-[120px] truncate cursor-help">
+                        {formatChartLabel(row.campaignName)}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[300px]">
+                      <p>{row.campaignName}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableCell>
+                <TableCell className="py-1 text-xs">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="max-w-[120px] truncate cursor-help">
+                        {formatChartLabel(row.adSetName)}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[300px]">
+                      <p>{row.adSetName}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableCell>
+                <TableCell className="py-1 text-xs text-right">{formatValue(row.impressions, 'number')}</TableCell>
+                <TableCell className="py-1 text-xs text-right">{formatValue(row.linkClicks, 'number')}</TableCell>
+                <TableCell className="py-1 text-xs text-right">{formatValue(row.ctr, 'ctr')}</TableCell>
+                <TableCell className="py-1 text-xs text-right">{formatValue(row.cpm, 'cpm')}</TableCell>
+                <TableCell className="py-1 text-xs text-right">{formatValue(row.amountSpent, 'money')}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </TooltipProvider>
   );
 };
 

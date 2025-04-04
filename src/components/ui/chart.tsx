@@ -48,14 +48,14 @@ export const formatChartLabel = (name: string, maxLength = 15) => {
     // Get first letter or two of the rest
     const suffix = parts[2]?.trim().substring(0, 2) || "";
     
-    return `${brand} | ${type} | ${suffix}...`;
+    return `${brand.substring(0, 5)}${brand.length > 5 ? "…" : ""} | ${type}${suffix ? ` | ${suffix}` : ""}`;
   }
   
   // If short enough, return as is
   if (name.length <= maxLength) return name;
   
-  // Otherwise truncate
-  return name.substring(0, maxLength - 2) + "...";
+  // Otherwise truncate with ellipsis
+  return name.substring(0, maxLength - 1) + "…";
 };
 
 const ChartContainer = React.forwardRef<
