@@ -18,8 +18,9 @@ service cloud.firestore {
     
     // Check if user has admin role
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return userDoc != null && (userDoc.role == 'admin' || userDoc.role == 'super_admin');
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && userDoc.data != null && 
+             (userDoc.data.role == 'admin' || userDoc.data.role == 'super_admin');
     }
     
     // Check if user has access to app
@@ -31,13 +32,15 @@ service cloud.firestore {
       
       // Check if user has a role assigned
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      if (userDoc != null) {
+      if (userDoc != null && userDoc.data != null) {
         return true;
       }
       
       // Check if user is in any admin's team
-      let teamQuery = query('users', where('team', 'array-contains', request.auth.token.email));
-      return !exists(teamQuery);
+      let adminDocs = get(/databases/$(database)/documents/users);
+      return adminDocs != null && adminDocs.data != null && 
+             adminDocs.data.team != null && 
+             request.auth.token.email in adminDocs.data.team;
     }
     
     // Users collection rules
