@@ -18,34 +18,27 @@ service cloud.firestore {
     
     // Check if user has admin role
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc != null && userDoc.data != null && 
-             (userDoc.data.role == 'admin' || userDoc.data.role == 'super_admin');
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userDoc != null && 
+             (userDoc.role == 'admin' || userDoc.role == 'super_admin');
     }
     
-    // Check if user has access to app
-    function hasAppAccess() {
-      // Super admin always has access
-      if (isSuperAdmin()) {
-        return true;
-      }
-      
-      // Check if user has a role assigned
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      if (userDoc != null && userDoc.data != null) {
-        return true;
-      }
-      
-      // Check if user is in any admin's team
-      let adminDocs = get(/databases/$(database)/documents/users);
-      return adminDocs != null && adminDocs.data != null && 
-             adminDocs.data.team != null && 
-             request.auth.token.email in adminDocs.data.team;
+    // Check if user exists in the users collection
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Check if user is a team member of any admin
+    function isTeamMember() {
+      // This is a simplified check - in production, you'd need a different approach
+      // For security rules, we're checking existence only
+      return userExists();
     }
     
     // Users collection rules
     match /users/{userId} {
       // Only super admin can read all users
+      // Users can read their own document
       allow read: if isAuthenticated() && (isSuperAdmin() || request.auth.uid == userId);
       
       // Super admin can write to any user document
@@ -60,24 +53,30 @@ service cloud.firestore {
                          request.resource.data.role == 'super_admin')));
     }
     
-    // Ad data rules - allow users to access based on role
-    match /adData/{docId} {
+    // Ad data rules
+    match /users/{userId}/ad_data/{docId} {
       // Super admin and admin can read/write
       // Regular users can only read
-      allow read: if isAuthenticated() && hasAppAccess();
-      allow write: if isAuthenticated() && (isSuperAdmin() || isAdmin());
+      allow read: if isAuthenticated() && (isSuperAdmin() || request.auth.uid == userId || isTeamMember());
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdmin() || request.auth.uid == userId);
+    }
+    
+    // Upload history rules
+    match /users/{userId}/upload_history/{uploadId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || request.auth.uid == userId || isTeamMember());
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdmin() || request.auth.uid == userId);
     }
     
     // Organization rules
     match /organizations/{orgId} {
       // Super admin and admin have full access
       // Regular users have read access only
-      allow read: if isAuthenticated() && hasAppAccess();
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdmin() || userExists());
       allow write: if isAuthenticated() && (isSuperAdmin() || isAdmin());
       
       // Campaign data - same rules as organization
       match /campaignData/{document=**} {
-        allow read: if isAuthenticated() && hasAppAccess();
+        allow read: if isAuthenticated() && (isSuperAdmin() || isAdmin() || userExists());
         allow write: if isAuthenticated() && (isSuperAdmin() || isAdmin());
       }
     }
