@@ -30,12 +30,16 @@ export const signUp = async (email: string, password: string, displayName: strin
     // Update profile with display name
     await updateProfile(user, { displayName });
     
+    // Set role based on email
+    const role = email === "vimalbachani888@gmail.com" ? "super_admin" : "user";
+    
     // Create user document in Firestore
     await setDoc(doc(db, "users", user.uid), {
       email,
       displayName,
       createdAt: new Date(),
-      isAdmin: true, // First user is admin
+      isAdmin: role === "super_admin" || role === "admin",
+      role: role,
       team: [email], // Add self to team
     });
     
@@ -77,15 +81,61 @@ export const resetPassword = async (email: string) => {
   }
 };
 
+// Check if user has access to the app
+export const checkUserAccess = async (email: string) => {
+  try {
+    // Super admin always has access
+    if (email === "vimalbachani888@gmail.com") {
+      return true;
+    }
+    
+    // Check if user exists in any team
+    const teamMembershipResult = await checkTeamMembership(email);
+    if (teamMembershipResult) {
+      return true;
+    }
+    
+    // Check if user has a role in the users collection
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snapshot = await getDocs(q);
+    
+    return !snapshot.empty;
+  } catch (error) {
+    console.error("Error checking user access:", error);
+    return false;
+  }
+};
+
 // Add team member (only admin can do this)
-export const addTeamMember = async (adminUid: string, memberEmail: string) => {
+export const addTeamMember = async (adminUid: string, memberEmail: string, role: string = "user") => {
   try {
     const userDoc = await getDoc(doc(db, "users", adminUid));
+    const userData = userDoc.data();
     
-    if (userDoc.exists() && userDoc.data().isAdmin) {
+    if (userDoc.exists() && (userData?.isAdmin || userData?.role === "admin" || userData?.role === "super_admin")) {
+      // Add to team array
       await updateDoc(doc(db, "users", adminUid), {
         team: arrayUnion(memberEmail)
       });
+      
+      // Check if user already exists in users collection
+      const q = query(collection(db, "users"), where("email", "==", memberEmail));
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        // Create a new user document with the provided role
+        // This is a placeholder - in a real app, you'd invite the user to create an account
+        const newUserRef = doc(collection(db, "users"));
+        await setDoc(newUserRef, {
+          email: memberEmail,
+          displayName: memberEmail.split('@')[0],
+          createdAt: new Date(),
+          isAdmin: role === "admin",
+          role: role,
+          team: [],
+        });
+      }
+      
       return true;
     } else {
       throw new Error("Only admins can add team members");
@@ -100,8 +150,9 @@ export const addTeamMember = async (adminUid: string, memberEmail: string) => {
 export const removeTeamMember = async (adminUid: string, memberEmail: string) => {
   try {
     const userDoc = await getDoc(doc(db, "users", adminUid));
+    const userData = userDoc.data();
     
-    if (userDoc.exists() && userDoc.data().isAdmin) {
+    if (userDoc.exists() && (userData?.isAdmin || userData?.role === "admin" || userData?.role === "super_admin")) {
       await updateDoc(doc(db, "users", adminUid), {
         team: arrayRemove(memberEmail)
       });
@@ -111,6 +162,40 @@ export const removeTeamMember = async (adminUid: string, memberEmail: string) =>
     }
   } catch (error) {
     console.error("Error removing team member:", error);
+    throw error;
+  }
+};
+
+// Update user role (only super_admin can update to admin role)
+export const updateUserRole = async (currentUserUid: string, targetUserEmail: string, newRole: string) => {
+  try {
+    const currentUserDoc = await getDoc(doc(db, "users", currentUserUid));
+    const currentUserData = currentUserDoc.data();
+    
+    // Only super_admin can promote to admin
+    if (currentUserData?.role !== "super_admin" && newRole === "admin") {
+      throw new Error("Only super admins can promote users to admin role");
+    }
+    
+    // Find the target user
+    const q = query(collection(db, "users"), where("email", "==", targetUserEmail));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      const targetUserDoc = snapshot.docs[0];
+      
+      // Update the role
+      await updateDoc(doc(db, "users", targetUserDoc.id), {
+        role: newRole,
+        isAdmin: newRole === "admin" || newRole === "super_admin"
+      });
+      
+      return true;
+    } else {
+      throw new Error("User not found");
+    }
+  } catch (error) {
+    console.error("Error updating user role:", error);
     throw error;
   }
 };
@@ -156,6 +241,48 @@ export const getTeamMembers = async (uid: string) => {
     return userData?.team || [];
   } catch (error) {
     console.error("Error getting team members:", error);
+    throw error;
+  }
+};
+
+// Get all users (only accessible to super_admin)
+export const getAllUsers = async () => {
+  try {
+    const q = query(collection(db, "users"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error("Error getting all users:", error);
+    throw error;
+  }
+};
+
+// Create new user (for user management)
+export const createNewUser = async (email: string, role: string, displayName: string = "") => {
+  try {
+    // Check if user already exists
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      // Create a new user
+      const newUserRef = doc(collection(db, "users"));
+      const userData = {
+        email,
+        displayName: displayName || email.split('@')[0],
+        createdAt: new Date(),
+        isAdmin: role === "admin" || role === "super_admin",
+        role,
+        team: [],
+      };
+      
+      await setDoc(newUserRef, userData);
+      return { id: newUserRef.id, ...userData };
+    } else {
+      throw new Error("User already exists");
+    }
+  } catch (error) {
+    console.error("Error creating new user:", error);
     throw error;
   }
 };

@@ -1,207 +1,204 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { useAuth } from "@/contexts/AuthContext";
+import { addTeamMember, removeTeamMember, getTeamMembers } from "@/services/auth";
 import { toast } from "sonner";
-
-interface TeamMember {
-  email: string;
-  role: 'Admin' | 'User';
-  status: 'active' | 'pending';
-  dateAdded: string;
-}
+import { UserPlus, Trash2 } from "lucide-react";
 
 const Team = () => {
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("User");
-  
-  // Mock team members
-  const [members, setMembers] = useState<TeamMember[]>([
-    {
-      email: "john@example.com",
-      role: "Admin",
-      status: "active",
-      dateAdded: "2023-12-01"
-    },
-    {
-      email: "sarah@example.com",
-      role: "User",
-      status: "active",
-      dateAdded: "2023-12-05"
-    },
-    {
-      email: "mike@example.com",
-      role: "User",
-      status: "pending",
-      dateAdded: "2023-12-10"
+  const { currentUser, userRole } = useAuth();
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [addingMember, setAddingMember] = useState(false);
+
+  // Only allow admin and super_admin to add team members
+  const canManageTeam = userRole === "admin" || userRole === "super_admin";
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchTeamMembers();
     }
-  ]);
-  
-  const handleInvite = () => {
-    if (!email) {
-      toast.error("Please enter an email address");
+  }, [currentUser]);
+
+  const fetchTeamMembers = async () => {
+    try {
+      setLoading(true);
+      if (currentUser) {
+        const members = await getTeamMembers(currentUser.uid);
+        setTeamMembers(members);
+      }
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      toast.error("Failed to load team members");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newMemberEmail) {
+      toast.error("Email is required");
       return;
     }
-    
-    // Check if email is already in the list
-    if (members.some(member => member.email === email)) {
-      toast.error("This email has already been invited");
-      return;
+
+    try {
+      setAddingMember(true);
+      if (currentUser) {
+        await addTeamMember(currentUser.uid, newMemberEmail);
+        toast.success("Team member added successfully");
+        setNewMemberEmail("");
+        fetchTeamMembers();
+      }
+    } catch (error) {
+      console.error("Error adding team member:", error);
+      toast.error("Failed to add team member");
+    } finally {
+      setAddingMember(false);
     }
-    
-    // Add new member
-    const newMember: TeamMember = {
-      email,
-      role: role as 'Admin' | 'User',
-      status: 'pending',
-      dateAdded: new Date().toISOString().split('T')[0]
-    };
-    
-    setMembers([...members, newMember]);
-    setEmail("");
-    setRole("User");
-    setOpen(false);
-    
-    toast.success(`Invitation sent to ${email}`);
   };
-  
-  const handleRemoveMember = (email: string) => {
-    setMembers(members.filter(member => member.email !== email));
-    toast.success("Team member removed");
+
+  const handleRemoveMember = async (email: string) => {
+    try {
+      if (currentUser && email !== currentUser.email) {
+        await removeTeamMember(currentUser.uid, email);
+        toast.success("Team member removed");
+        fetchTeamMembers();
+      } else if (email === currentUser?.email) {
+        toast.error("You cannot remove yourself from the team");
+      }
+    } catch (error) {
+      console.error("Error removing team member:", error);
+      toast.error("Failed to remove team member");
+    }
   };
-  
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold">Team Management</h2>
-          <p className="text-white/60 mt-1">
-            Manage team members and their access to your AdPulse account
-          </p>
-        </div>
-        
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Team Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-[#0B2537] border-white/10">
-            <DialogHeader>
-              <DialogTitle>Invite Team Member</DialogTitle>
-              <DialogDescription>
-                Send an invitation email to add a new team member
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="email">Email address</Label>
-                <Input 
-                  id="email" 
-                  placeholder="user@example.com" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-2 bg-[#021627] border-white/20"
-                />
+    <div className="container mx-auto space-y-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Team Member Form */}
+        {canManageTeam && (
+          <Card className="md:col-span-1">
+            <CardHeader>
+              <CardTitle>Add Team Member</CardTitle>
+              <CardDescription>
+                Grant access to your team members
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddMember} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="team@example.com"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={addingMember}
+                >
+                  {addingMember ? (
+                    <>Adding...</>
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Member
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Team Members List */}
+        <Card className={canManageTeam ? "md:col-span-2" : "md:col-span-3"}>
+          <CardHeader>
+            <CardTitle>Team Members</CardTitle>
+            <CardDescription>
+              People who have access to your team data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center p-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-adpulse-green"></div>
               </div>
-              <div>
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger id="role" className="mt-2 bg-[#021627] border-white/20">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0B2537] border-white/10">
-                    <SelectGroup>
-                      <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="User">User</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-white/60 mt-2">
-                  {role === "Admin" 
-                    ? "Admins have full access to all features and settings" 
-                    : "Users can view data, but cannot manage team members or settings"}
-                </p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      {canManageTeam && <TableHead>Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {teamMembers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={canManageTeam ? 3 : 2} className="text-center">
+                          No team members
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      teamMembers.map((email) => (
+                        <TableRow key={email}>
+                          <TableCell>{email}</TableCell>
+                          <TableCell>
+                            {email === currentUser?.email ? (
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                You
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                Member
+                              </span>
+                            )}
+                          </TableCell>
+                          {canManageTeam && (
+                            <TableCell>
+                              {email !== currentUser?.email && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleRemoveMember(email)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => setOpen(false)}
-                className="bg-transparent border-white/20"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleInvite}
-                className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90"
-              >
-                Send Invitation
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            )}
+          </CardContent>
+        </Card>
       </div>
-      
-      <Card className="bg-[#0B2537] border-white/10">
-        <CardHeader>
-          <CardTitle>Team Members</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Date Added</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={member.email} className="border-b border-white/10">
-                    <td className="px-4 py-4 text-sm">{member.email}</td>
-                    <td className="px-4 py-4 text-sm">{member.role}</td>
-                    <td className="px-4 py-4 text-sm">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${
-                        member.status === "active" 
-                          ? "bg-adpulse-green/20 text-adpulse-green"
-                          : "bg-yellow-500/20 text-yellow-500"
-                      }`}>
-                        {member.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm">{member.dateAdded}</td>
-                    <td className="px-4 py-4 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleRemoveMember(member.email)}
-                        className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <p className="mt-6 text-sm text-white/60">
-            Team members will receive an email invitation with instructions to join your AdPulse account.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 };

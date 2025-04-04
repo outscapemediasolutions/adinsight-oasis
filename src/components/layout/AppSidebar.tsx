@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, FileUp, Home, LogOut, Settings, Users } from "lucide-react";
+import { BarChart3, FileUp, Home, LogOut, Settings, Users, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/services/auth";
@@ -11,15 +11,20 @@ import { useNavigate } from "react-router-dom";
 const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, userRole, hasAccess } = useAuth();
   
-  const menuItems = [
-    { icon: Home, label: "Dashboard", path: "/" },
-    { icon: FileUp, label: "Data Upload", path: "/upload" },
-    { icon: BarChart3, label: "Analytics", path: "/analytics" },
-    { icon: Users, label: "Team", path: "/team" },
-    { icon: Settings, label: "Settings", path: "/settings" },
+  // Define all possible menu items
+  const allMenuItems = [
+    { icon: Home, label: "Dashboard", path: "/", access: "dashboard" },
+    { icon: FileUp, label: "Data Upload", path: "/upload", access: "upload" },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", access: "analytics" },
+    { icon: Users, label: "Team", path: "/team", access: "team" },
+    { icon: UserCog, label: "User Management", path: "/user-management", access: "userManagement" },
+    { icon: Settings, label: "Settings", path: "/settings", access: "settings" },
   ];
+  
+  // Filter menu items based on user role
+  const menuItems = allMenuItems.filter(item => hasAccess(item.access));
   
   const isActive = (path: string) => {
     if (path === "/" && location.pathname === "/dashboard") return true;
@@ -83,6 +88,11 @@ const AppSidebar = () => {
                 <p className="text-xs text-white/60 truncate max-w-[160px]">
                   {currentUser?.email || ""}
                 </p>
+                {userRole && (
+                  <p className="text-xs text-adpulse-green truncate max-w-[160px] capitalize">
+                    {userRole.replace('_', ' ')}
+                  </p>
+                )}
               </div>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { signIn, resetPassword } from "@/services/auth";
+import { signIn, resetPassword, checkUserAccess } from "@/services/auth";
 import { ArrowRight, Mail, Lock } from "lucide-react";
 
 const Login = () => {
@@ -31,6 +31,24 @@ const Login = () => {
     setIsLoading(true);
     
     try {
+      // First check if it's the super admin or has access
+      const isSuperAdmin = email === "vimalbachani888@gmail.com";
+      
+      if (!isSuperAdmin) {
+        // Check if user has access to the app
+        const hasAccess = await checkUserAccess(email);
+        if (!hasAccess) {
+          toast({
+            variant: "destructive",
+            title: "Access denied",
+            description: "You are not authorized to use this app",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Proceed with login
       await signIn(email, password);
       toast({
         title: "Login successful",
