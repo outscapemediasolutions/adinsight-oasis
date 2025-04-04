@@ -123,7 +123,7 @@ const PerformanceChart = ({
         campaign.impressions += item.impressions || 0;
         campaign.clicks += item.linkClicks || 0;
         campaign.spend += item.amountSpent || 0;
-        campaign.sales += item.sales || 0;
+        campaign.sales += item.purchasesValue || 0; // Changed from non-existent 'sales' to 'purchasesValue'
         
         // Only count results if there's a valid result type
         if (item.resultType && item.resultType.trim() !== '') {
