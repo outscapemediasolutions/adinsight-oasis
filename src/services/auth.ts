@@ -130,7 +130,7 @@ export const addTeamMember = async (adminUid: string, memberEmail: string, role:
           email: memberEmail,
           displayName: memberEmail.split('@')[0],
           createdAt: new Date(),
-          isAdmin: role === "admin",
+          isAdmin: role === "admin" || role === "super_admin",
           role: role,
           team: [],
         });
