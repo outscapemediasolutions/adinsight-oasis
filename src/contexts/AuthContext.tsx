@@ -1,8 +1,7 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { auth } from "../services/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { getUserData, checkTeamMembership, checkUserAccess } from "../services/auth";
+import { getUserData, checkTeamMembership, checkUserAccess, UserRole } from "../services/auth";
 import { toast } from "sonner";
 import { Navigate, useNavigate } from "react-router-dom";
 
@@ -11,7 +10,7 @@ interface UserData {
   email: string;
   displayName: string;
   isAdmin: boolean;
-  role: "super_admin" | "admin" | "user";
+  role: UserRole;
   team: string[];
   createdAt: Date;
 }
@@ -22,7 +21,7 @@ interface AuthContextInterface {
   userData: UserData | null;
   loading: boolean;
   adminUser: any | null; // Admin user data if current user is a team member
-  userRole: "super_admin" | "admin" | "user" | null;
+  userRole: UserRole | null;
   hasAccess: (section: string) => boolean;
 }
 
@@ -44,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<any | null>(null);
-  const [userRole, setUserRole] = useState<"super_admin" | "admin" | "user" | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   // Function to check if user has access to a specific section
   const hasAccess = (section: string): boolean => {
@@ -73,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (user) {
           // Check if user is the super admin
-          const isSuperAdmin = user.email === "vimalbachani888@gmail.com";
+          const isSuperAdmin = user.email === "vimalbachani888@gmail.com" || user.email === "vimal111@gmail.com";
           
           // Get user data from Firestore
           const data = await getUserData(user.uid);
@@ -98,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (isSuperAdmin) {
             setUserRole("super_admin");
           } else if (data?.role) {
-            setUserRole(data.role);
+            setUserRole(data.role as UserRole);
           } else if (data?.isAdmin) {
             setUserRole("admin");
           } else {
