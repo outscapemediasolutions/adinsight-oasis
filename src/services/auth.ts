@@ -1,3 +1,4 @@
+
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
@@ -312,3 +313,4 @@ export const createNewUser = async (email: string, role: string, displayName: st
     throw error;
   }
 };
+
