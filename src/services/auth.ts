@@ -1,4 +1,3 @@
-
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
@@ -22,6 +21,9 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+// Define role type for type safety
+type UserRole = "super_admin" | "admin" | "user";
+
 // Sign up a new user
 export const signUp = async (email: string, password: string, displayName: string) => {
   try {
@@ -32,7 +34,7 @@ export const signUp = async (email: string, password: string, displayName: strin
     await updateProfile(user, { displayName });
     
     // Set role based on email
-    const role = email === "vimalbachani888@gmail.com" ? "super_admin" : "user";
+    const role: UserRole = email === "vimalbachani888@gmail.com" ? "super_admin" : "user";
     
     // Create user document in Firestore
     await setDoc(doc(db, "users", user.uid), {
@@ -313,4 +315,3 @@ export const createNewUser = async (email: string, role: string, displayName: st
     throw error;
   }
 };
-
