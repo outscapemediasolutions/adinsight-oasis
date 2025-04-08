@@ -17,7 +17,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  deleteDoc
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
@@ -196,6 +197,32 @@ export const updateUserRole = async (currentUserUid: string, targetUserEmail: st
     }
   } catch (error) {
     console.error("Error updating user role:", error);
+    throw error;
+  }
+};
+
+// Delete user (only super_admin can delete users)
+export const deleteUser = async (currentUserUid: string, userIdToDelete: string, userEmailToDelete: string) => {
+  try {
+    // Check if current user is super admin
+    const currentUserDoc = await getDoc(doc(db, "users", currentUserUid));
+    const currentUserData = currentUserDoc.data();
+    
+    if (!currentUserData || currentUserData.role !== "super_admin") {
+      throw new Error("Only super admins can delete users");
+    }
+    
+    // Prevent deletion of super admin account
+    if (userEmailToDelete === "vimalbachani888@gmail.com") {
+      throw new Error("Cannot delete super admin account");
+    }
+    
+    // Delete the user document
+    await deleteDoc(doc(db, "users", userIdToDelete));
+    
+    return true;
+  } catch (error) {
+    console.error("Error deleting user:", error);
     throw error;
   }
 };

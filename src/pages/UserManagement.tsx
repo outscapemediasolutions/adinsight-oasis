@@ -19,7 +19,17 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { getAllUsers, updateUserRole, createNewUser } from "@/services/auth";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getAllUsers, updateUserRole, createNewUser, deleteUser } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { PlusCircle, Trash2, Edit } from "lucide-react";
@@ -42,6 +52,8 @@ const UserManagement = () => {
   const [newUserRole, setNewUserRole] = useState("user");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Check if current user is super admin
   const isSuperAdmin = userRole === "super_admin";
@@ -111,6 +123,25 @@ const UserManagement = () => {
       toast.error(error.message || "Failed to create user");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete || !currentUser) return;
+
+    try {
+      await deleteUser(currentUser.uid, userToDelete.id, userToDelete.email);
+      toast.success(`User ${userToDelete.displayName || userToDelete.email} deleted successfully`);
+      setShowDeleteDialog(false);
+      setUserToDelete(null);
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete user");
     }
   };
 
@@ -248,6 +279,18 @@ const UserManagement = () => {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
+                              
+                              {/* Delete button - only visible to super admin and not for their own account */}
+                              {isSuperAdmin && user.email !== "vimalbachani888@gmail.com" && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteClick(user)}
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -260,6 +303,31 @@ const UserManagement = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the user account for{" "}
+              <span className="font-semibold">
+                {userToDelete?.displayName || userToDelete?.email}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -24,7 +24,18 @@ const AppSidebar = () => {
   ];
   
   // Filter menu items based on user role
-  const menuItems = allMenuItems.filter(item => hasAccess(item.access));
+  const menuItems = allMenuItems.filter(item => {
+    // Super admin can see everything
+    if (userRole === "super_admin") return true;
+    
+    // Admin can see everything except User Management
+    if (userRole === "admin") {
+      return item.access !== "userManagement";
+    }
+    
+    // Regular users can only see Dashboard and Analytics
+    return hasAccess(item.access);
+  });
   
   const isActive = (path: string) => {
     if (path === "/" && location.pathname === "/dashboard") return true;
