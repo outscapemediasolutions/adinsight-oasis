@@ -1,3 +1,4 @@
+
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
@@ -22,7 +23,7 @@ import {
 import { auth, db } from "./firebase";
 
 // Define role type for type safety
-type UserRole = "super_admin" | "admin" | "user";
+export type UserRole = "super_admin" | "admin" | "user";
 
 // Sign up a new user
 export const signUp = async (email: string, password: string, displayName: string) => {
@@ -110,7 +111,7 @@ export const checkUserAccess = async (email: string) => {
 };
 
 // Add team member (only admin can do this)
-export const addTeamMember = async (adminUid: string, memberEmail: string, role: string = "user") => {
+export const addTeamMember = async (adminUid: string, memberEmail: string, role: UserRole = "user") => {
   try {
     const userDoc = await getDoc(doc(db, "users", adminUid));
     const userData = userDoc.data();
@@ -170,7 +171,7 @@ export const removeTeamMember = async (adminUid: string, memberEmail: string) =>
 };
 
 // Update user role (only super_admin can update to admin role)
-export const updateUserRole = async (currentUserUid: string, targetUserEmail: string, newRole: string) => {
+export const updateUserRole = async (currentUserUid: string, targetUserEmail: string, newRole: UserRole) => {
   try {
     const currentUserDoc = await getDoc(doc(db, "users", currentUserUid));
     const currentUserData = currentUserDoc.data();
@@ -287,7 +288,7 @@ export const getAllUsers = async () => {
 };
 
 // Create new user (for user management)
-export const createNewUser = async (email: string, role: string, displayName: string = "") => {
+export const createNewUser = async (email: string, role: UserRole, displayName: string = "") => {
   try {
     // Check if user already exists
     const q = query(collection(db, "users"), where("email", "==", email));
