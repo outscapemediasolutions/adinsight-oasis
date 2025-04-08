@@ -11,6 +11,8 @@ import { Calendar, Upload, ListFilter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import DateRangeSelector from "@/components/DateRangeSelector";
+import { format } from "date-fns";
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -18,7 +20,19 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<ReturnType<typeof calculateMetrics> | null>(null);
   const [campaignData, setCampaignData] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<{ start?: Date, end?: Date }>({});
   const navigate = useNavigate();
+  
+  // Handle date range selection
+  const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
+    if (!startDate || !endDate) return;
+    
+    console.log("Dashboard: Date range changed", { startDate, endDate });
+    setDateRange({ start: startDate, end: endDate });
+    
+    // We'll fetch data with the new date range in the useEffect below
+    // This ensures we don't have duplicate fetch logic
+  };
   
   useEffect(() => {
     const fetchData = async () => {
@@ -27,7 +41,17 @@ const Dashboard = () => {
       try {
         setIsLoading(true);
         console.log("Dashboard: Fetching data for user", currentUser.uid);
-        const data = await getAdData(currentUser.uid);
+        
+        // Prepare filters if date range is selected
+        let filters: any = {};
+        if (dateRange.start && dateRange.end) {
+          // Format dates to match Firestore string format (YYYY-MM-DD)
+          filters.startDate = format(dateRange.start, 'yyyy-MM-dd');
+          filters.endDate = format(dateRange.end, 'yyyy-MM-dd');
+          console.log("Dashboard: Applying date filters", filters);
+        }
+        
+        const data = await getAdData(currentUser.uid, filters);
         console.log("Dashboard: Fetched data count:", data.length);
         setAdData(data);
         
@@ -48,7 +72,12 @@ const Dashboard = () => {
           console.log("Dashboard: Setting campaign data", formattedCampaignData.length);
           setCampaignData(formattedCampaignData);
         } else {
-          console.log("Dashboard: No data available");
+          console.log("Dashboard: No data available for the selected filters");
+          setMetrics(null);
+          setCampaignData([]);
+          if (dateRange.start && dateRange.end) {
+            toast.info("No data available for the selected date range");
+          }
         }
       } catch (error) {
         console.error("Error fetching ad data:", error);
@@ -59,7 +88,7 @@ const Dashboard = () => {
     };
     
     fetchData();
-  }, [currentUser]);
+  }, [currentUser, dateRange.start, dateRange.end]); // Add dateRange as dependencies
   
   const handleRefresh = async () => {
     if (!currentUser) return;
@@ -68,7 +97,15 @@ const Dashboard = () => {
       setIsLoading(true);
       toast.info("Refreshing data...");
       console.log("Dashboard: Refreshing data for user", currentUser.uid);
-      const data = await getAdData(currentUser.uid);
+      
+      // Prepare filters if date range is selected
+      let filters: any = {};
+      if (dateRange.start && dateRange.end) {
+        filters.startDate = format(dateRange.start, 'yyyy-MM-dd');
+        filters.endDate = format(dateRange.end, 'yyyy-MM-dd');
+      }
+      
+      const data = await getAdData(currentUser.uid, filters);
       console.log("Dashboard: Refreshed data count:", data.length);
       setAdData(data);
       
@@ -86,6 +123,14 @@ const Dashboard = () => {
         
         setCampaignData(formattedCampaignData);
         toast.success("Data refreshed successfully");
+      } else {
+        setMetrics(null);
+        setCampaignData([]);
+        if (dateRange.start && dateRange.end) {
+          toast.info("No data available for the selected date range");
+        } else {
+          toast.warning("No data available");
+        }
       }
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -104,10 +149,11 @@ const Dashboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9">
-            <Calendar className="mr-2 h-4 w-4" />
-            Date Range
-          </Button>
+          <DateRangeSelector 
+            onDateRangeChange={handleDateRangeChange}
+            startDate={dateRange.start}
+            endDate={dateRange.end}
+          />
           <Button variant="outline" size="sm" className="h-9">
             <ListFilter className="mr-2 h-4 w-4" />
             Filter
@@ -211,7 +257,11 @@ const Dashboard = () => {
       
       {adData.length === 0 && !isLoading && (
         <Card className="p-8 text-center">
-          <h3 className="text-lg font-medium mb-2">No data available</h3>
+          <h3 className="text-lg font-medium mb-2">
+            {dateRange.start && dateRange.end 
+              ? "No data available for the selected date range" 
+              : "No data available"}
+          </h3>
           <p className="text-muted-foreground mb-4">Upload your ad data to see insights and analytics</p>
           <Button onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />

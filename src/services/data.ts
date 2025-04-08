@@ -176,11 +176,21 @@ export const getAdData = async (userId: string, filters: any = {}): Promise<AdDa
     
     // Apply filters
     if (filters.startDate && filters.endDate) {
+      console.log(`Filtering data from ${filters.startDate} to ${filters.endDate}`);
       q = query(q, where('date', '>=', filters.startDate), where('date', '<=', filters.endDate));
     }
 
     if (filters.uploadId) {
       q = query(q, where('uploadId', '==', filters.uploadId));
+    }
+    
+    // Add more filters if needed here
+    if (filters.campaignName) {
+      q = query(q, where('campaignName', '==', filters.campaignName));
+    }
+    
+    if (filters.adSetName) {
+      q = query(q, where('adSetName', '==', filters.adSetName));
     }
     
     const snapshot = await getDocs(q);

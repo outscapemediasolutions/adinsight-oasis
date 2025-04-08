@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,16 @@ const DateRangeSelector = ({ onDateRangeChange, startDate, endDate }: DateRangeP
   
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
+  // Update internal state when props change
+  useEffect(() => {
+    if (startDate !== selectedRange.from || endDate !== selectedRange.to) {
+      setSelectedRange({
+        from: startDate,
+        to: endDate
+      });
+    }
+  }, [startDate, endDate]);
+  
   const formatDate = (date: Date | undefined) => {
     if (!date) return "";
     return format(date, "MMM dd, yyyy");
@@ -32,7 +42,9 @@ const DateRangeSelector = ({ onDateRangeChange, startDate, endDate }: DateRangeP
   const handleRangeSelect = (range: { from: Date | undefined; to: Date | undefined }) => {
     setSelectedRange(range);
     
+    // Only call the parent's callback if both dates are selected
     if (range.from && range.to) {
+      console.log("DateRangeSelector: Range selected", { from: range.from, to: range.to });
       onDateRangeChange(range.from, range.to);
       setIsCalendarOpen(false);
     }
