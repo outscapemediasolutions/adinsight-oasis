@@ -44,7 +44,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
   const [uploadStatus, setUploadStatus] = useState<"idle" | "reading" | "validating" | "mapping" | "uploading" | "error" | "success">("idle");
   const [progress, setProgress] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [csvData, setCsvData] = useState<any[] | null>(null);
+  const [csvData, setCsvData] = useState<Record<string, string>[] | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [showMappingDialog, setShowMappingDialog] = useState<boolean>(false);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -99,7 +99,9 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
             return;
           }
           
-          setCsvData(results.data);
+          // Type assertion to ensure data is Record<string, string>[]
+          const typedData = results.data as Record<string, string>[];
+          setCsvData(typedData);
           
           try {
             setUploadStatus("uploading");
@@ -110,7 +112,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
               const { success, uploadId } = await processAndSaveShopifyCSVData(
                 currentUser.uid,
                 file.name,
-                results.data
+                typedData
               );
               
               if (success) {
@@ -121,7 +123,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
                 // Find date range in the data
                 let minDate = "";
                 let maxDate = "";
-                results.data.forEach((row: any) => {
+                typedData.forEach((row: Record<string, string>) => {
                   const createdAt = row["Created at"];
                   if (createdAt) {
                     if (!minDate || createdAt < minDate) minDate = createdAt;
@@ -223,7 +225,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
         // Find date range in the data
         let minDate = "";
         let maxDate = "";
-        csvData.forEach((row: any) => {
+        csvData.forEach((row: Record<string, string>) => {
           const createdAt = row["Created at"];
           if (createdAt) {
             if (!minDate || createdAt < minDate) minDate = createdAt;
