@@ -16,14 +16,6 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from "recharts";
 
 interface ShopifyChartsProps {
@@ -95,20 +87,39 @@ export const ShopifyCharts = ({ metrics, isLoading }: ShopifyChartsProps) => {
     "#6D28D9", // Purple
   ];
   
-  // Customer Behavior Data (sample - would be replaced with real data)
-  const customerBehaviorData = [
-    { category: "New Customers", value: 65 },
-    { category: "Returning Customers", value: 35 },
-  ];
+  // Process sales by day of week
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const salesByDayOfWeek = salesData.reduce((acc, item) => {
+    const date = new Date(item.date);
+    const dayOfWeek = daysOfWeek[date.getDay()];
+    
+    if (!acc[dayOfWeek]) {
+      acc[dayOfWeek] = {
+        day: dayOfWeek,
+        revenue: 0,
+        orders: 0,
+        count: 0
+      };
+    }
+    
+    acc[dayOfWeek].revenue += item.revenue;
+    acc[dayOfWeek].orders += item.orders;
+    acc[dayOfWeek].count += 1;
+    
+    return acc;
+  }, {} as Record<string, { day: string; revenue: number; orders: number; count: number }>);
   
-  // Product Category Performance (sample - would be replaced with real data)
-  const categoryPerformanceData = [
-    { category: "Clothing", sales: 65, profit: 45, returns: 12 },
-    { category: "Electronics", sales: 45, profit: 30, returns: 8 },
-    { category: "Home Goods", sales: 35, profit: 25, returns: 5 },
-    { category: "Accessories", sales: 30, profit: 20, returns: 3 },
-    { category: "Books", sales: 25, profit: 15, returns: 2 },
-  ];
+  // Calculate averages and format for chart
+  const weekDaySalesData = daysOfWeek.map(day => {
+    const data = salesByDayOfWeek[day] || { day, revenue: 0, orders: 0, count: 1 };
+    return {
+      day,
+      revenue: data.revenue,
+      avgRevenue: data.revenue / (data.count || 1),
+      orders: data.orders,
+      avgOrders: data.orders / (data.count || 1)
+    };
+  });
   
   return (
     <div className="space-y-6">
@@ -211,74 +222,95 @@ export const ShopifyCharts = ({ metrics, isLoading }: ShopifyChartsProps) => {
         </Card>
       </div>
       
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Customer Behavior</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={customerBehaviorData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Sales Performance</CardTitle>
+          <p className="text-sm text-muted-foreground">Sales distribution by days of the week</p>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <Tabs defaultValue="revenue" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="revenue">Revenue</TabsTrigger>
+              <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="average">Average</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="revenue" className="space-y-2">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={weekDaySalesData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
                 >
-                  {customerBehaviorData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => [`${value}%`, "Percentage"]}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Category Performance</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={300}>
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={categoryPerformanceData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="category" />
-                <PolarRadiusAxis angle={30} />
-                <Radar 
-                  name="Sales" 
-                  dataKey="sales" 
-                  stroke="#8B5CF6" 
-                  fill="#8B5CF6" 
-                  fillOpacity={0.6} 
-                />
-                <Radar 
-                  name="Profit" 
-                  dataKey="profit" 
-                  stroke="#0EA5E9" 
-                  fill="#0EA5E9" 
-                  fillOpacity={0.6} 
-                />
-                <Radar 
-                  name="Returns" 
-                  dataKey="returns" 
-                  stroke="#F97316" 
-                  fill="#F97316" 
-                  fillOpacity={0.6} 
-                />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis tickFormatter={(value) => `$${value}`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, "Revenue"]}
+                  />
+                  <Legend />
+                  <Bar dataKey="revenue" fill="#10B981" name="Total Revenue" />
+                </BarChart>
+              </ResponsiveContainer>
+            </TabsContent>
+            
+            <TabsContent value="orders" className="space-y-2">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={weekDaySalesData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="orders" fill="#F97316" name="Total Orders" />
+                </BarChart>
+              </ResponsiveContainer>
+            </TabsContent>
+            
+            <TabsContent value="average" className="space-y-2">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={weekDaySalesData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis yAxisId="left" tickFormatter={(value) => `$${value}`} />
+                  <YAxis yAxisId="right" orientation="right" />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => {
+                      if (name === "Average Revenue") {
+                        return [`$${value.toFixed(2)}`, name];
+                      }
+                      return [value.toFixed(2), name];
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="avgRevenue" yAxisId="left" fill="#6366F1" name="Average Revenue" />
+                  <Bar dataKey="avgOrders" yAxisId="right" fill="#EC4899" name="Average Orders" />
+                </BarChart>
+              </ResponsiveContainer>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -68,8 +68,8 @@ const Navbar = ({ toggleDarkMode, isDarkMode }: NavbarProps) => {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-adpulse-green flex items-center justify-center text-adpulse-blue-dark font-bold text-xl animate-pulse-scale">A</div>
-            <span className="text-xl font-bold text-foreground">AdPulse Analytics</span>
+            <div className="w-8 h-8 rounded-full bg-adpulse-green flex items-center justify-center text-adpulse-blue-dark font-bold text-xl animate-pulse-scale">D</div>
+            <span className="text-xl font-bold text-foreground">D2C Scaler</span>
           </Link>
         </div>
         

@@ -14,7 +14,6 @@ import { useNavigate } from "react-router-dom";
 import EmptyState from "./EmptyState";
 import { ShopifyAnalyticsSummary } from "./ShopifyAnalyticsSummary";
 import { ShopifyCharts } from "./charts/ShopifyCharts";
-import { ShopifyRecentOrders } from "./ShopifyRecentOrders";
 
 interface ShopifyDashboardProps {
   dateRange: { start?: Date; end?: Date };
@@ -256,8 +255,6 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
       <ShopifyAnalyticsSummary metrics={metrics} isLoading={isLoading} />
       
       <ShopifyCharts metrics={metrics} isLoading={isLoading} />
-      
-      <ShopifyRecentOrders orders={orders} isLoading={isLoading} />
     </div>
   );
 };
