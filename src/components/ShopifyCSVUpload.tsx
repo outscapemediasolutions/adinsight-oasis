@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import Papa from "papaparse";
@@ -99,7 +98,9 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
             return;
           }
           
-          setCsvData(results.data);
+          // Explicitly type the data as Record<string, string>[]
+          const typedData = results.data as Record<string, string>[];
+          setCsvData(typedData);
           
           try {
             setUploadStatus("uploading");
@@ -110,7 +111,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
               const { success, uploadId } = await processAndSaveShopifyCSVData(
                 currentUser.uid,
                 file.name,
-                results.data
+                typedData
               );
               
               if (success) {
@@ -121,7 +122,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
                 // Find date range in the data
                 let minDate = "";
                 let maxDate = "";
-                results.data.forEach((row: any) => {
+                typedData.forEach((row: Record<string, string>) => {
                   const createdAt = row["Created at"];
                   if (createdAt) {
                     if (!minDate || createdAt < minDate) minDate = createdAt;
@@ -223,7 +224,7 @@ const ShopifyCSVUpload: React.FC<ShopifyCSVUploadProps> = ({
         // Find date range in the data
         let minDate = "";
         let maxDate = "";
-        csvData.forEach((row: any) => {
+        csvData.forEach((row: Record<string, string>) => {
           const createdAt = row["Created at"];
           if (createdAt) {
             if (!minDate || createdAt < minDate) minDate = createdAt;

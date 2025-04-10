@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -18,7 +17,8 @@ import {
   ResponsiveContainer, 
   Tooltip, 
   XAxis, 
-  YAxis 
+  YAxis,
+  ValueType 
 } from "recharts";
 import { ShopifyOrderData } from "@/services/shopifyData";
 import { Loader2 } from "lucide-react";
@@ -259,7 +259,6 @@ export const DeviceUsageChart: React.FC<DeviceUsageChartProps> = ({ data, isLoad
           cy="70%"
         >
           <RadialBar
-            minAngle={15}
             background
             clockWise
             dataKey="count"
@@ -493,8 +492,10 @@ export const RevenueOverTimeChart: React.FC<RevenueOverTimeChartProps> = ({ data
             axisLine={false}
           />
           <Tooltip 
-            formatter={(value, name) => {
-              return name === 'revenue' ? [`₹${value.toFixed(2)}`, 'Revenue'] : [value, 'Orders'];
+            formatter={(value: ValueType, name: string) => {
+              return name === 'revenue' ? 
+                [`₹${typeof value === 'number' ? value.toFixed(2) : value}`, 'Revenue'] : 
+                [value, 'Orders'];
             }}
             labelFormatter={(label) => `Date: ${label}`}
           />
@@ -614,7 +615,7 @@ export const FulfillmentSpeedChart: React.FC<FulfillmentSpeedChartProps> = ({ da
           />
           <YAxis tickLine={false} axisLine={false} />
           <Tooltip 
-            formatter={(value) => [value, 'Orders']}
+            formatter={(value: ValueType) => [value, 'Orders']}
             labelFormatter={(label) => `Fulfillment Time: ${label}`}
           />
           <Bar 
