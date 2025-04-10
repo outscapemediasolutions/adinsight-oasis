@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +27,7 @@ const Analytics = () => {
   const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
     if (!startDate || !endDate) return;
     
-    console.log(`Analytics: Filtering by date range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
+    console.log(`Meta Analytics: Filtering by date range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
     
     setDateRange({ start: startDate, end: endDate });
     
@@ -44,7 +45,7 @@ const Analytics = () => {
         return item.date >= startDateStr && item.date <= endDateStr;
       });
       
-      console.log(`Analytics: Filtered data from ${adData.length} to ${filtered.length} items`);
+      console.log(`Meta Analytics: Filtered data from ${adData.length} to ${filtered.length} items`);
       setFilteredData(filtered);
       
       if (filtered.length === 0) {
@@ -59,9 +60,9 @@ const Analytics = () => {
       
       try {
         setIsLoading(true);
-        console.log("Analytics: Fetching data");
+        console.log("Meta Analytics: Fetching data");
         const data = await getAdData(currentUser.uid);
-        console.log(`Analytics: Fetched ${data.length} records`);
+        console.log(`Meta Analytics: Fetched ${data.length} records`);
         setAdData(data);
         setFilteredData(data);
         setHasData(data.length > 0);
@@ -82,7 +83,7 @@ const Analytics = () => {
     try {
       setIsLoading(true);
       toast.info("Refreshing data...");
-      console.log("Analytics: Refreshing data");
+      console.log("Meta Analytics: Refreshing data");
       const data = await getAdData(currentUser.uid);
       setAdData(data);
       
@@ -156,8 +157,8 @@ const Analytics = () => {
   if (!hasData && !isLoading) {
     return (
       <EmptyState
-        title="No data available for analysis"
-        description="Please upload your advertising data first to see analytics"
+        title="No Meta Ad data available for analysis"
+        description="Please upload your Meta advertising data first to see analytics"
         icon={<BarChart className="h-10 w-10 text-adpulse-green/60" />}
         action={
           <Button onClick={() => navigate("/upload")} className="bg-adpulse-green text-[#021627] hover:bg-adpulse-green/90">
@@ -172,9 +173,9 @@ const Analytics = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold font-poppins">Advanced Analytics</h2>
+          <h2 className="text-xl font-semibold font-poppins">Meta Ad Analytics</h2>
           <p className="text-white/60 mt-1 font-poppins">
-            Detailed analysis of your advertising performance
+            Detailed analysis of your Meta advertising performance
           </p>
         </div>
         

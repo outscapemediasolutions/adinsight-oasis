@@ -1,120 +1,220 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, FileUp, Home, LogOut, Settings, Users, UserCog } from "lucide-react";
+import {
+  BarChart3,
+  Gauge,
+  LayoutDashboard,
+  LineChart,
+  Settings,
+  ShoppingBag,
+  Upload,
+  Users,
+  ChevronRight,
+  BarChart,
+  ShoppingCart,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
-import { signOut } from "@/services/auth";
-import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useMobile } from "@/hooks/use-mobile";
 
-const AppSidebar = () => {
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  onNavigation?: () => void;
+}
+
+const AppSidebar = ({ className, onNavigation, ...props }: SidebarProps) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { currentUser, userRole, hasAccess } = useAuth();
-  
-  // Define all possible menu items
-  const allMenuItems = [
-    { icon: Home, label: "Dashboard", path: "/", access: "dashboard" },
-    { icon: FileUp, label: "Data Upload", path: "/upload", access: "upload" },
-    { icon: BarChart3, label: "Analytics", path: "/analytics", access: "analytics" },
-    { icon: Users, label: "Team", path: "/team", access: "team" },
-    { icon: UserCog, label: "User Management", path: "/user-management", access: "userManagement" },
-    { icon: Settings, label: "Settings", path: "/settings", access: "settings" },
-  ];
-  
-  // Filter menu items based on user role
-  const menuItems = allMenuItems.filter(item => {
-    // Super admin can see everything
-    if (userRole === "super_admin") return true;
-    
-    // Admin can see everything except User Management
-    if (userRole === "admin") {
-      return item.access !== "userManagement";
+  const { isMobile } = useMobile();
+  const [showAnalyticsSub, setShowAnalyticsSub] = useState(false);
+
+  // Determine if any sub-item is active
+  useEffect(() => {
+    if (location.pathname === "/analytics" || location.pathname === "/shopify-analytics") {
+      setShowAnalyticsSub(true);
     }
-    
-    // Regular users can only see Dashboard and Analytics
-    return hasAccess(item.access);
-  });
+  }, [location.pathname]);
   
+  const handleSubNavigation = () => {
+    if (onNavigation && isMobile) {
+      onNavigation();
+    }
+  };
+
   const isActive = (path: string) => {
-    if (path === "/" && location.pathname === "/dashboard") return true;
     return location.pathname === path;
   };
-  
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast.success("Signed out successfully");
-      navigate("/login");
-    } catch (error) {
-      console.error("Sign out error:", error);
-      toast.error("Failed to sign out");
-    }
-  };
-  
-  if (!currentUser) return null;
-  
+
   return (
-    <div className="w-[240px] h-full bg-[#021120] border-r border-white/10 flex flex-col">
-      <div className="p-6">
-        <h1 className="text-adpulse-green text-2xl font-bold">AdPulse</h1>
-      </div>
-      
-      <nav className="flex-1 px-3">
-        <ul className="space-y-1">
-          {menuItems.map((item) => (
-            <li key={item.path}>
-              <Link
-                to={item.path}
+    <div className={cn("pb-12", className)} {...props}>
+      <div className="space-y-4 py-4">
+        <div className="px-4 py-2">
+          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight text-white">
+            Main Menu
+          </h2>
+          <div className="space-y-1">
+            <Link to="/dashboard" onClick={onNavigation}>
+              <Button
+                variant={isActive("/dashboard") ? "default" : "ghost"}
+                size="sm"
                 className={cn(
-                  "flex items-center px-3 py-2.5 rounded-lg gap-3 text-sm group transition-colors",
-                  isActive(item.path)
-                    ? "bg-adpulse-green/10 text-adpulse-green" 
-                    : "text-white/70 hover:text-white hover:bg-white/5"
+                  "w-full justify-start",
+                  isActive("/dashboard")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
                 )}
               >
-                <item.icon className={cn(
-                  "h-5 w-5 transition-colors",
-                  isActive(item.path) ? "text-adpulse-green" : "text-white/70 group-hover:text-white"
-                )} />
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      
-      <div className="p-3 mt-auto">
-        <div className="border-t border-white/10 pt-4 pb-2">
-          <div className="px-3 py-2">
-            <div className="flex items-center">
-              <div className="h-8 w-8 rounded-full bg-adpulse-green/20 text-adpulse-green flex items-center justify-center">
-                {currentUser?.email?.charAt(0).toUpperCase() || "U"}
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium truncate max-w-[160px]">
-                  {currentUser?.email?.split('@')[0] || "User"}
-                </p>
-                <p className="text-xs text-white/60 truncate max-w-[160px]">
-                  {currentUser?.email || ""}
-                </p>
-                {userRole && (
-                  <p className="text-xs text-adpulse-green truncate max-w-[160px] capitalize">
-                    {userRole.replace('_', ' ')}
-                  </p>
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link to="/upload" onClick={onNavigation}>
+              <Button
+                variant={isActive("/upload") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/upload")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
                 )}
-              </div>
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Data Upload
+              </Button>
+            </Link>
+            
+            {/* Analytics Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-between",
+                  (isActive("/analytics") || isActive("/shopify-analytics"))
+                    ? "text-white"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+                onClick={() => setShowAnalyticsSub(!showAnalyticsSub)}
+              >
+                <div className="flex items-center">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Analytics
+                </div>
+                <ChevronRight 
+                  className={cn(
+                    "h-4 w-4 transition-transform", 
+                    showAnalyticsSub ? "rotate-90" : ""
+                  )} 
+                />
+              </Button>
+              
+              {showAnalyticsSub && (
+                <div className="pl-6 space-y-1 mt-1">
+                  <Link to="/analytics" onClick={handleSubNavigation}>
+                    <Button
+                      variant={isActive("/analytics") ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start",
+                        isActive("/analytics")
+                          ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                          : "text-white/80 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      <LineChart className="mr-2 h-4 w-4" />
+                      Meta Ad Analytics
+                    </Button>
+                  </Link>
+                  <Link to="/shopify-analytics" onClick={handleSubNavigation}>
+                    <Button
+                      variant={isActive("/shopify-analytics") ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start",
+                        isActive("/shopify-analytics")
+                          ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                          : "text-white/80 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Shopify Analytics
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
+            
+            <Link to="/reports" onClick={onNavigation}>
+              <Button
+                variant={isActive("/reports") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/reports")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <BarChart className="mr-2 h-4 w-4" />
+                Reports
+              </Button>
+            </Link>
           </div>
-          
-          <button
-            onClick={handleSignOut}
-            className="flex items-center px-3 py-2.5 rounded-lg w-full text-white/70 hover:text-white hover:bg-white/5 text-sm gap-3 mt-2"
-          >
-            <LogOut className="h-5 w-5" />
-            Sign out
-          </button>
+        </div>
+        <Separator className="mx-4 bg-white/10" />
+        <div className="px-4 py-2">
+          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight text-white">
+            Administration
+          </h2>
+          <div className="space-y-1">
+            <Link to="/team" onClick={onNavigation}>
+              <Button
+                variant={isActive("/team") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/team")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Team
+              </Button>
+            </Link>
+            <Link to="/user-management" onClick={onNavigation}>
+              <Button
+                variant={isActive("/user-management") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/user-management")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                User Management
+              </Button>
+            </Link>
+            <Link to="/settings" onClick={onNavigation}>
+              <Button
+                variant={isActive("/settings") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/settings")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
