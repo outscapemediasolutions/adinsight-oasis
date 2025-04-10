@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -260,7 +259,6 @@ export const DeviceUsageChart: React.FC<DeviceUsageChartProps> = ({ data, isLoad
         >
           <RadialBar
             background
-            clockWise
             dataKey="count"
             label={{ position: 'insideStart', fill: '#fff' }}
           >

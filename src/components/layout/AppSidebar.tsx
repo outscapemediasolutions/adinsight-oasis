@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowLeftCircle, AreaChart, Clock, HelpCircle, LayoutDashboard, Settings, Upload, Users, ShoppingBag } from "lucide-react";
 
-import { Navbar } from "../Navbar";
+import Navbar from "../Navbar";
 
 const AppSidebar = () => {
-  const { currentUser, userAccess } = useAuth();
+  const { currentUser, hasAccess } = useAuth();
   const location = useLocation();
   const [showSidebar, setShowSidebar] = useState(!useIsMobile());
   const isMobile = useIsMobile();
@@ -116,7 +116,7 @@ const AppSidebar = () => {
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {navItems
-                      .filter(item => userAccess?.[item.access])
+                      .filter(item => hasAccess(item.access))
                       .map((item) => (
                         <SidebarMenuItem key={item.path}>
                           <SidebarMenuButton 
