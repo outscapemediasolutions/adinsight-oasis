@@ -1,3 +1,4 @@
+
 import { auth, db } from './firebase';
 import { 
   createUserWithEmailAndPassword, 
@@ -328,7 +329,7 @@ export const createNewUser = async (email: string, role: UserRole, displayName: 
     });
     
     // Send password reset email
-    await sendPasswordResetEmail(auth, email);
+    await firebaseSendResetEmail(auth, email);
     
     return user;
   } catch (error) {
