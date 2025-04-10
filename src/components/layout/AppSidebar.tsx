@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useMobile } from "@/hooks/use-mobile";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   onNavigation?: () => void;
@@ -25,7 +26,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const AppSidebar = ({ className, onNavigation, ...props }: SidebarProps) => {
   const location = useLocation();
-  const isMobile = useIsMobile();
+  const { isMobile } = useMobile();
   const [showAnalyticsSub, setShowAnalyticsSub] = useState(false);
 
   // Determine if any sub-item is active
