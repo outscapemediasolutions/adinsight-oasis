@@ -3,7 +3,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut, 
-  sendPasswordResetEmail,
+  sendPasswordResetEmail as firebaseSendResetEmail,
   updateProfile,
   User
 } from 'firebase/auth';
@@ -72,11 +72,11 @@ export const signOut = async () => {
   }
 };
 
-export const sendResetEmail = async (email: string) => {
+export const resetPassword = async (email: string) => {
   try {
-    await sendPasswordResetEmail(auth, email);
+    await firebaseSendResetEmail(auth, email);
   } catch (error) {
-    console.error("Error sending reset email:", error);
+    console.error("Error sending password reset:", error);
     throw error;
   }
 };
@@ -182,6 +182,26 @@ export const checkTeamMembership = async (email: string) => {
     return null;
   } catch (error) {
     console.error("Error checking team membership:", error);
+    throw error;
+  }
+};
+
+export const getTeamMembers = async (adminId: string): Promise<string[]> => {
+  try {
+    // Find team for this admin
+    const teamsRef = collection(db, "teams");
+    const q = query(teamsRef, where("adminId", "==", adminId));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return [];
+    }
+    
+    // Return team members
+    const teamData = snapshot.docs[0].data();
+    return teamData.members || [];
+  } catch (error) {
+    console.error("Error getting team members:", error);
     throw error;
   }
 };
