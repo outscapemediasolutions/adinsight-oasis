@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -258,7 +259,9 @@ export const DeviceUsageChart: React.FC<DeviceUsageChartProps> = ({ data, isLoad
           cy="70%"
         >
           <RadialBar
+            minAngle={15}
             background
+            clockWise
             dataKey="count"
             label={{ position: 'insideStart', fill: '#fff' }}
           >
@@ -369,8 +372,8 @@ export const TopProductsChart: React.FC<TopProductsChartProps> = ({ data, isLoad
             width={100}
           />
           <Tooltip 
-            formatter={(value: any, name) => {
-              return name === 'revenue' ? [`₹${Number(value).toFixed(2)}`, 'Revenue'] : [value, 'Quantity Sold'];
+            formatter={(value, name) => {
+              return name === 'revenue' ? [`₹${value.toFixed(2)}`, 'Revenue'] : [value, 'Quantity Sold'];
             }}
             labelFormatter={(label) => `Product: ${label}`}
           />
@@ -490,8 +493,8 @@ export const RevenueOverTimeChart: React.FC<RevenueOverTimeChartProps> = ({ data
             axisLine={false}
           />
           <Tooltip 
-            formatter={(value: any, name) => {
-              return name === 'revenue' ? [`₹${Number(value).toFixed(2)}`, 'Revenue'] : [value, 'Orders'];
+            formatter={(value, name) => {
+              return name === 'revenue' ? [`₹${value.toFixed(2)}`, 'Revenue'] : [value, 'Orders'];
             }}
             labelFormatter={(label) => `Date: ${label}`}
           />

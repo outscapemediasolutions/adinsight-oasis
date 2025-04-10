@@ -1,210 +1,223 @@
 
-import { useEffect, useState } from "react";
-import { useLocation, Link } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+  BarChart3,
+  Gauge,
+  LayoutDashboard,
+  LineChart,
+  Settings,
+  ShoppingBag,
+  Upload,
+  Users,
+  ChevronRight,
+  BarChart,
+  ShoppingCart,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { ArrowLeftCircle, AreaChart, Clock, HelpCircle, LayoutDashboard, Settings, Upload, Users, ShoppingBag } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { useMobile } from "@/hooks/use-mobile";
 
-import Navbar from "../Navbar";
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  onNavigation?: () => void;
+}
 
-const AppSidebar = () => {
-  const { currentUser, hasAccess } = useAuth();
+const AppSidebar = ({ className, onNavigation, ...props }: SidebarProps) => {
   const location = useLocation();
-  const [showSidebar, setShowSidebar] = useState(!useIsMobile());
-  const isMobile = useIsMobile();
-  
+  const { isMobile } = useMobile();
+  const [showAnalyticsSub, setShowAnalyticsSub] = useState(false);
+
+  // Determine if any sub-item is active
   useEffect(() => {
-    if (isMobile) {
-      setShowSidebar(false);
-    } else {
-      setShowSidebar(true);
+    if (location.pathname === "/analytics" || location.pathname === "/shopify-analytics") {
+      setShowAnalyticsSub(true);
     }
-  }, [isMobile]);
+  }, [location.pathname]);
   
-  const isActivePath = (path: string) => {
-    return location.pathname === path || location.pathname === `${path}/`;
+  const handleSubNavigation = () => {
+    if (onNavigation && isMobile) {
+      onNavigation();
+    }
   };
-  
-  const navItems = [
-    {
-      name: "Dashboard",
-      path: "/dashboard",
-      icon: LayoutDashboard,
-      access: "dashboard",
-    },
-    {
-      name: "Upload",
-      path: "/upload",
-      icon: Upload,
-      access: "upload",
-    },
-    {
-      name: "Meta Ad Analytics",
-      path: "/analytics",
-      icon: AreaChart,
-      access: "analytics",
-    },
-    {
-      name: "Shopify Analytics",
-      path: "/shopify-analytics",
-      icon: ShoppingBag,
-      access: "analytics",
-    },
-    {
-      name: "Team",
-      path: "/team",
-      icon: Users,
-      access: "team",
-    },
-    {
-      name: "Settings",
-      path: "/settings",
-      icon: Settings,
-      access: "settings",
-    },
-    {
-      name: "Reports",
-      path: "/reports",
-      icon: Clock,
-      access: "reports",
-    },
-    {
-      name: "User Management",
-      path: "/user-management",
-      icon: Users,
-      access: "userManagement",
-    },
-  ];
-  
-  // Render nothing if user is not authenticated
-  if (!currentUser) return null;
-  
+
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
   return (
-    <SidebarProvider>
-      <div className="flex w-full min-h-screen bg-black">
-        {showSidebar && (
-          <Sidebar className="border-r border-white/10 min-w-[280px]">
-            <div className="flex h-16 items-center border-b border-white/10 px-4">
-              <Link 
-                to="/" 
-                className="flex items-center space-x-2 text-xl font-semibold text-adpulse-green"
+    <div className={cn("pb-12", className)} {...props}>
+      <div className="space-y-4 py-4">
+        <div className="px-4 py-2">
+          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight text-white">
+            Main Menu
+          </h2>
+          <div className="space-y-1">
+            <Link to="/dashboard" onClick={onNavigation}>
+              <Button
+                variant={isActive("/dashboard") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/dashboard")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
               >
-                <span className="rounded-md bg-adpulse-green/20 p-1">
-                  <AreaChart className="h-6 w-6 text-adpulse-green" />
-                </span>
-                <span>AdPulse</span>
-              </Link>
-            </div>
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link to="/upload" onClick={onNavigation}>
+              <Button
+                variant={isActive("/upload") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/upload")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Data Upload
+              </Button>
+            </Link>
             
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {navItems
-                      .filter(item => hasAccess(item.access))
-                      .map((item) => (
-                        <SidebarMenuItem key={item.path}>
-                          <SidebarMenuButton 
-                            asChild
-                            className={cn(
-                              isActivePath(item.path) 
-                                ? "bg-adpulse-green/10 text-adpulse-green font-medium"
-                                : "hover:bg-white/5 hover:text-white text-white/70"
-                            )}
-                          >
-                            <Link to={item.path} className="flex items-center">
-                              <item.icon className="mr-2 h-5 w-5" />
-                              <span>{item.name}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+            {/* Analytics Dropdown */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-between",
+                  (isActive("/analytics") || isActive("/shopify-analytics"))
+                    ? "text-white"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+                onClick={() => setShowAnalyticsSub(!showAnalyticsSub)}
+              >
+                <div className="flex items-center">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Analytics
+                </div>
+                <ChevronRight 
+                  className={cn(
+                    "h-4 w-4 transition-transform", 
+                    showAnalyticsSub ? "rotate-90" : ""
+                  )} 
+                />
+              </Button>
               
-              <SidebarGroup>
-                <SidebarGroupLabel>Help</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton 
-                        asChild
-                        className="hover:bg-white/5 hover:text-white text-white/70"
-                      >
-                        <a href="#" className="flex items-center">
-                          <HelpCircle className="mr-2 h-5 w-5" />
-                          <span>Documentation</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-            
-            {isMobile && (
-              <div className="p-4 border-t border-white/10">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => setShowSidebar(false)}
-                >
-                  <ArrowLeftCircle className="mr-2 h-4 w-4" />
-                  Hide Sidebar
-                </Button>
-              </div>
-            )}
-          </Sidebar>
-        )}
-        
-        <div className="flex-1 flex flex-col">
-          <div className="sticky top-0 z-30 flex items-center justify-between bg-black/60 backdrop-blur-sm border-b border-white/10 h-16 px-4">
-            {!showSidebar && (
-              <SidebarTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => setShowSidebar(true)}>
-                  <span className="sr-only">Open sidebar</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-6 w-6"
-                  >
-                    <path d="M3 7h18M3 12h18M3 17h18" />
-                  </svg>
-                </Button>
-              </SidebarTrigger>
-            )}
-            <Navbar className={cn(!showSidebar ? "flex-1" : "")} />
-          </div>
-          
-          <main className="flex-1">
-            <div className="p-4">
-              {/* App content rendered here */}
+              {showAnalyticsSub && (
+                <div className="pl-6 space-y-1 mt-1">
+                  <Link to="/analytics" onClick={handleSubNavigation}>
+                    <Button
+                      variant={isActive("/analytics") ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start",
+                        isActive("/analytics")
+                          ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                          : "text-white/80 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      <LineChart className="mr-2 h-4 w-4" />
+                      Meta Ad Analytics
+                    </Button>
+                  </Link>
+                  <Link to="/shopify-analytics" onClick={handleSubNavigation}>
+                    <Button
+                      variant={isActive("/shopify-analytics") ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start",
+                        isActive("/shopify-analytics")
+                          ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                          : "text-white/80 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Shopify Analytics
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
-          </main>
+            
+            <Link to="/reports" onClick={onNavigation}>
+              <Button
+                variant={isActive("/reports") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/reports")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <BarChart className="mr-2 h-4 w-4" />
+                Reports
+              </Button>
+            </Link>
+          </div>
+        </div>
+        <Separator className="mx-4 bg-white/10" />
+        <div className="px-4 py-2">
+          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight text-white">
+            Administration
+          </h2>
+          <div className="space-y-1">
+            <Link to="/team" onClick={onNavigation}>
+              <Button
+                variant={isActive("/team") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/team")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Team
+              </Button>
+            </Link>
+            <Link to="/user-management" onClick={onNavigation}>
+              <Button
+                variant={isActive("/user-management") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/user-management")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                User Management
+              </Button>
+            </Link>
+            <Link to="/settings" onClick={onNavigation}>
+              <Button
+                variant={isActive("/settings") ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/settings")
+                    ? "bg-adpulse-green/90 text-foreground hover:bg-adpulse-green"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                )}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 };
 

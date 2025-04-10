@@ -17,12 +17,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
 interface NavbarProps {
-  toggleDarkMode?: () => void;
-  isDarkMode?: boolean;
-  className?: string; // Add className prop to the interface
+  toggleDarkMode: () => void;
+  isDarkMode: boolean;
 }
 
-const Navbar = ({ toggleDarkMode, isDarkMode, className }: NavbarProps) => {
+const Navbar = ({ toggleDarkMode, isDarkMode }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { currentUser, userData } = useAuth();
   const location = useLocation();
@@ -65,7 +64,7 @@ const Navbar = ({ toggleDarkMode, isDarkMode, className }: NavbarProps) => {
   };
 
   return (
-    <header className={cn("sticky top-0 z-50 w-full backdrop-blur-lg bg-background/80 border-b", className)}>
+    <header className="sticky top-0 z-50 w-full backdrop-blur-lg bg-background/80 border-b">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link to="/" className="flex items-center space-x-2">
