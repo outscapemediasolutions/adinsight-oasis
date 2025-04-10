@@ -14,7 +14,6 @@ import Upload from "./pages/Upload";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
-import ShopifyAnalytics from "./pages/ShopifyAnalytics"; // New import
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
 import { useEffect } from "react";
@@ -70,11 +69,6 @@ const App = () => {
                 <Route path="analytics" element={
                   <ProtectedRoute requiredAccess="analytics">
                     <Analytics />
-                  </ProtectedRoute>
-                } />
-                <Route path="shopify-analytics" element={
-                  <ProtectedRoute requiredAccess="analytics">
-                    <ShopifyAnalytics />
                   </ProtectedRoute>
                 } />
                 <Route path="team" element={

@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getAllUsers, updateUserRole, createNewUser, deleteUser, UserRole } from "@/services/auth";
+import { getAllUsers, updateUserRole, createNewUser, deleteUser } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { PlusCircle, Trash2, Edit } from "lucide-react";
@@ -38,7 +38,7 @@ interface User {
   id: string;
   email: string;
   displayName: string;
-  role: UserRole;
+  role: string;
   isAdmin: boolean;
   createdAt: any;
 }
@@ -49,7 +49,7 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserDisplayName, setNewUserDisplayName] = useState("");
-  const [newUserRole, setNewUserRole] = useState<UserRole>("user");
+  const [newUserRole, setNewUserRole] = useState("user");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -75,7 +75,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleRoleChange = async (userId: string, userEmail: string, newRole: UserRole) => {
+  const handleRoleChange = async (userId: string, userEmail: string, newRole: string) => {
     if (!isSuperAdmin && newRole === "admin") {
       toast.error("Only super admins can assign admin roles");
       return;
@@ -183,7 +183,7 @@ const UserManagement = () => {
                 <Label htmlFor="role">Role</Label>
                 <Select 
                   value={newUserRole} 
-                  onValueChange={(value: UserRole) => setNewUserRole(value)}
+                  onValueChange={setNewUserRole}
                   disabled={!isSuperAdmin && newUserRole === "admin"}
                 >
                   <SelectTrigger>
@@ -247,7 +247,7 @@ const UserManagement = () => {
                             {editingUserId === user.id ? (
                               <Select 
                                 defaultValue={user.role} 
-                                onValueChange={(value: UserRole) => {
+                                onValueChange={(value) => {
                                   handleRoleChange(user.id, user.email, value);
                                   setEditingUserId(null);
                                 }}
