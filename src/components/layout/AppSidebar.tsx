@@ -7,11 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/services/auth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, userRole, hasAccess } = useAuth();
+  const isMobile = useIsMobile();
   
   // Define all possible menu items
   const allMenuItems = [
