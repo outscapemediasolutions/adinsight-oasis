@@ -4,7 +4,7 @@ import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, AlertCircle, CheckCircle, X } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle, X, FileText, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,7 +29,7 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0];
       
-      if (selectedFile.type !== 'text/csv') {
+      if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
         setError("Please upload a CSV file.");
         return;
       }
@@ -129,19 +129,39 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
         });
       }, 100);
       
-      // Parse CSV
+      // Parse CSV with more explicit configuration
       Papa.parse(file, {
         header: true,
+        skipEmptyLines: 'greedy', // Skip empty lines more aggressively
+        delimiter: ',', // Explicitly set delimiter
         complete: async (results) => {
           try {
+            // Check if we have any data
+            if (!results.data || results.data.length === 0) {
+              throw new Error("CSV file appears to be empty or improperly formatted");
+            }
+            
+            // Check for parsing errors
             if (results.errors.length > 0) {
-              throw new Error(`CSV parsing error: ${results.errors[0].message}`);
+              const errorMessage = results.errors[0].message;
+              
+              // Provide more user-friendly error messages
+              if (errorMessage.includes("Too few fields")) {
+                throw new Error("CSV format error: The file doesn't have enough columns. Please ensure you're uploading a standard Shopify export. Use the template guide for reference.");
+              } else if (errorMessage.includes("Too many fields")) {
+                throw new Error("CSV format error: The file has too many columns. Please ensure you're uploading a standard Shopify export.");
+              } else {
+                throw new Error(`CSV parsing error: ${errorMessage}`);
+              }
             }
             
             const columnValidationError = validateRequiredColumns(results.meta.fields || []);
             if (columnValidationError) {
               throw new Error(columnValidationError);
             }
+            
+            console.log("CSV successfully parsed. First row:", results.data[0]);
+            console.log("Found fields:", results.meta.fields);
             
             // Process and upload the data
             const uploadId = await processData(results.data as Record<string, string>[]);
@@ -168,7 +188,16 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
         },
         error: (error) => {
           handleUploadError(error);
-        }
+        },
+        // Add transform to handle BOM characters and other encoding issues
+        transform: (value) => {
+          // Remove BOM character if present
+          if (value.charCodeAt(0) === 0xFEFF) {
+            return value.substr(1);
+          }
+          return value;
+        },
+        encoding: "UTF-8" // Explicitly set encoding
       });
     } catch (error: any) {
       handleUploadError(error);
@@ -185,12 +214,34 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
     setError(`Upload failed: ${error.message}`);
     onUploadComplete?.(false);
     toast.error(`Upload failed: ${error.message}`);
+    
+    console.error("Detailed upload error:", error);
   };
   
   const handleReset = () => {
     setFile(null);
     setError(null);
     setSuccess(false);
+  };
+  
+  const showFileInfo = () => {
+    // Add a helper to show the user more information about their file
+    if (!file) return null;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const firstLine = content.split('\n')[0];
+      const fieldCount = firstLine.split(',').length;
+      
+      console.log(`CSV preview - First line has ${fieldCount} fields`);
+      console.log(`CSV preview - First 50 chars: ${content.substring(0, 50)}`);
+    };
+    reader.readAsText(file);
+    
+    toast.info("Inspecting file format...", {
+      description: "Checking the structure of your CSV file"
+    });
   };
   
   return (
@@ -225,7 +276,7 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-md bg-primary/10">
-                <Upload className="h-5 w-5 text-primary" />
+                <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="font-medium">{file.name}</p>
@@ -234,12 +285,23 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleReset}>
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={showFileInfo}
+                title="Inspect file format"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleReset}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <div className="mt-4">
-            <Button onClick={handleUpload} disabled={isUploading}>
+            <Button onClick={handleUpload} disabled={isUploading} className="w-full">
               Upload and Process
             </Button>
           </div>
@@ -279,7 +341,15 @@ const ShopifyCSVUpload = ({ onUploadStart, onUploadComplete }: ShopifyCSVUploadP
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-5 w-5" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="flex flex-col gap-2">
+            <span>{error}</span>
+            {error.includes("CSV format") && (
+              <span className="text-sm">
+                Make sure your file is a valid Shopify CSV export. Please check the template guide
+                for the correct format.
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
     </div>
