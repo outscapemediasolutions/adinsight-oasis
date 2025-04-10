@@ -151,7 +151,7 @@ const ShopifyUploadHistory = ({ refreshTrigger = 0 }: ShopifyUploadHistoryProps)
                 <EmptyState 
                   title="No upload history"
                   description="You haven't uploaded any Shopify data yet."
-                  icon={FileSpreadsheet}
+                  icon={<FileSpreadsheet />} {/* Fixed: Wrapping the icon component with JSX brackets */}
                 />
               ) : (
                 <div className="overflow-x-auto">
