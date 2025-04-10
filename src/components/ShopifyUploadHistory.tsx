@@ -127,7 +127,7 @@ const ShopifyUploadHistory = ({ refreshTrigger = 0 }: ShopifyUploadHistoryProps)
   };
   
   return (
-    <>
+    <React.Fragment>
       <Card>
         <CardHeader>
           <CardTitle>Shopify Upload History</CardTitle>
@@ -146,12 +146,12 @@ const ShopifyUploadHistory = ({ refreshTrigger = 0 }: ShopifyUploadHistoryProps)
               ))}
             </div>
           ) : (
-            <>
+            <React.Fragment>
               {uploads.length === 0 ? (
                 <EmptyState 
                   title="No upload history"
                   description="You haven't uploaded any Shopify data yet."
-                  icon={<FileSpreadsheet />} {/* Fixed: Wrapping the icon component with JSX brackets */}
+                  icon={<FileSpreadsheet />} 
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -191,7 +191,7 @@ const ShopifyUploadHistory = ({ refreshTrigger = 0 }: ShopifyUploadHistoryProps)
                   </Table>
                 </div>
               )}
-            </>
+            </React.Fragment>
           )}
         </CardContent>
       </Card>
@@ -213,7 +213,7 @@ const ShopifyUploadHistory = ({ refreshTrigger = 0 }: ShopifyUploadHistoryProps)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </React.Fragment>
   );
 };
 
