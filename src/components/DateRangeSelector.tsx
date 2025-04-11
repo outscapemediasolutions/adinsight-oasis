@@ -5,7 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 
 export interface DateRangeProps {
   onDateRangeChange: (startDate: Date | undefined, endDate: Date | undefined) => void;
@@ -50,30 +50,49 @@ const DateRangeSelector = ({ onDateRangeChange, startDate, endDate }: DateRangeP
     }
   };
   
+  const handleReset = () => {
+    setSelectedRange({ from: undefined, to: undefined });
+    onDateRangeChange(undefined, undefined);
+    setIsCalendarOpen(false);
+  };
+  
   return (
-    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-      <PopoverTrigger asChild>
+    <div className="flex items-center gap-2">
+      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-transparent border-white/20 hover:bg-white/5 text-white h-9 w-auto"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {selectedRange.from && selectedRange.to
+              ? `${formatDate(selectedRange.from)} - ${formatDate(selectedRange.to)}`
+              : "Select Date Range"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="center">
+          <Calendar
+            mode="range"
+            selected={selectedRange}
+            onSelect={handleRangeSelect}
+            numberOfMonths={2}
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+      
+      {(selectedRange.from || selectedRange.to) && (
         <Button
           variant="outline"
           size="sm"
-          className="bg-transparent border-white/20 hover:bg-white/5 text-white h-9 w-auto"
+          onClick={handleReset}
+          className="bg-transparent border-white/20 hover:bg-white/5 text-white h-9"
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {selectedRange.from && selectedRange.to
-            ? `${formatDate(selectedRange.from)} - ${formatDate(selectedRange.to)}`
-            : "Select Date Range"}
+          <RotateCcw className="h-4 w-4" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="center">
-        <Calendar
-          mode="range"
-          selected={selectedRange}
-          onSelect={handleRangeSelect}
-          numberOfMonths={2}
-          className={cn("p-3 pointer-events-auto")}
-        />
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 };
 

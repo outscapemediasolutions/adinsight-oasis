@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,7 @@ import { db } from "@/services/firebase";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { format } from "date-fns";
 import { RefreshCw, Upload } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import EmptyState from "./EmptyState";
 import { ShopifyAnalyticsSummary } from "./ShopifyAnalyticsSummary";
 import { ShopifyCharts } from "./charts/ShopifyCharts";
@@ -42,6 +42,7 @@ export interface ShopifyOrder {
 const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<ShopifyOrder[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -217,7 +218,10 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
   };
   
   const handleUploadClick = () => {
-    navigate("/shopify-analytics", { state: { defaultTab: "upload" } });
+    // Navigate to /shopify-analytics with a state indicating to open the upload tab
+    navigate("/shopify-analytics", { 
+      state: { defaultTab: "upload" } 
+    });
   };
   
   if (!isLoading && orders.length === 0) {

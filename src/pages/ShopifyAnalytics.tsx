@@ -11,13 +11,23 @@ import ShopifyUploadHistory from "@/components/ShopifyUploadHistory";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import DateRangeSelector from "@/components/DateRangeSelector";
+import { useLocation } from "react-router-dom";
 
 const ShopifyAnalytics = () => {
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
   const [dateRange, setDateRange] = useState<{ start?: Date, end?: Date }>({});
+  
+  useEffect(() => {
+    // Check for tab to show from navigation state
+    if (location.state && location.state.defaultTab) {
+      setActiveTab(location.state.defaultTab);
+    }
+  }, [location.state]);
   
   const handleTemplateDownload = () => {
     const headers = [
@@ -100,7 +110,7 @@ const ShopifyAnalytics = () => {
         />
       </div>
       
-      <Tabs defaultValue="dashboard" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-[#021627]/50">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="upload">Data Upload</TabsTrigger>
