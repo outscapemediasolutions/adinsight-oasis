@@ -61,7 +61,7 @@ const AppSidebar = () => {
   return (
     <div className="w-[240px] h-full bg-[#021120] border-r border-white/10 flex flex-col">
       <div className="p-6">
-        <h1 className="text-adpulse-green text-2xl font-bold">AdPulse</h1>
+        <h1 className="text-adpulse-green text-2xl font-bold">D2C Scaler</h1>
       </div>
       
       <nav className="flex-1 px-3">

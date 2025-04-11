@@ -222,14 +222,14 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
   
   if (!isLoading && orders.length === 0) {
     return (
-      <Card className="p-8 text-center">
+      <Card className="p-8 text-center border border-muted/20 bg-card/90 backdrop-blur-sm">
         <h3 className="text-lg font-medium mb-2">
           {dateRange.start && dateRange.end 
             ? "No data available for the selected date range" 
             : "No Shopify data available"}
         </h3>
         <p className="text-muted-foreground mb-4">Upload your Shopify sales report to see insights and analytics</p>
-        <Button onClick={handleUploadClick}>
+        <Button onClick={handleUploadClick} className="bg-adpulse-green hover:bg-adpulse-green/90">
           <Upload className="mr-2 h-4 w-4" />
           Upload Shopify Data
         </Button>

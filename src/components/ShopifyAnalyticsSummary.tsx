@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Users, ShoppingBag, ShoppingCart, TrendingUp, CreditCard } from "lucide-react";
+import { DollarSign, Users, ShoppingBag, ShoppingCart, TrendingUp, CreditCard, IndianRupee } from "lucide-react";
 
 interface ShopifyAnalyticsSummaryProps {
   metrics: {
@@ -19,8 +19,8 @@ export const ShopifyAnalyticsSummary = ({ metrics, isLoading }: ShopifyAnalytics
   const summaryCards = [
     {
       title: "Total Revenue",
-      value: metrics ? `$${metrics.totalRevenue.toFixed(2)}` : "$0.00",
-      icon: DollarSign,
+      value: metrics ? `₹${metrics.totalRevenue.toFixed(2)}` : "₹0.00",
+      icon: IndianRupee,
       description: "Revenue from all orders",
       colorClass: "text-green-500 bg-green-500/10",
     },
@@ -33,7 +33,7 @@ export const ShopifyAnalyticsSummary = ({ metrics, isLoading }: ShopifyAnalytics
     },
     {
       title: "Average Order Value",
-      value: metrics ? `$${metrics.avgOrderValue.toFixed(2)}` : "$0.00",
+      value: metrics ? `₹${metrics.avgOrderValue.toFixed(2)}` : "₹0.00",
       icon: CreditCard,
       description: "Average value per order",
       colorClass: "text-purple-500 bg-purple-500/10",
@@ -64,7 +64,7 @@ export const ShopifyAnalyticsSummary = ({ metrics, isLoading }: ShopifyAnalytics
   return (
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       {summaryCards.map((card, index) => (
-        <Card key={index}>
+        <Card key={index} className="border border-muted/20 bg-card/90 backdrop-blur-sm hover:shadow-md transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
             <div className={`p-2 rounded-md ${card.colorClass}`}>

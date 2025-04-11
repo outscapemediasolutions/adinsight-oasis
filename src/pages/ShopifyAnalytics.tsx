@@ -92,7 +92,7 @@ const ShopifyAnalytics = () => {
   return (
     <div className="container relative py-10 font-poppins">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h2 className="text-3xl font-bold tracking-tight">Shopify Analytics</h2>
+        <h2 className="text-3xl font-bold tracking-tight">D2C Scaler - Shopify Analytics</h2>
         <DateRangeSelector 
           onDateRangeChange={handleDateRangeChange}
           startDate={dateRange.start}
