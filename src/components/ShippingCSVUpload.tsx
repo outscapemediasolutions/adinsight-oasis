@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
@@ -48,10 +47,14 @@ const ShippingCSVUpload = ({
         header: true,
         preview: 1,
         complete: function(results) {
-          if (results.data && results.data.length > 0) {
-            const headers = Object.keys(results.data[0]);
-            if (onHeadersDetected) {
-              onHeadersDetected(headers);
+          if (results.data && results.data.length > 0 && results.data[0]) {
+            // Fix: Ensure results.data[0] is an object before spreading
+            const firstRow = results.data[0];
+            if (typeof firstRow === 'object' && firstRow !== null) {
+              const headers = Object.keys(firstRow);
+              if (onHeadersDetected) {
+                onHeadersDetected(headers);
+              }
             }
           }
         }
@@ -118,29 +121,32 @@ const ShippingCSVUpload = ({
                 
                 // Process data and add to Firestore
                 for (const row of batch) {
-                  try {
-                    await addDoc(
-                      collection(db, 'users', auth.currentUser!.uid, 'shippingData'),
-                      {
-                        ...row,
-                        // Convert date strings to Date objects
-                        shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
-                        uploadDate: serverTimestamp(),
-                        // Parse numeric values
-                        productQuantity: parseInt(row['Product Quantity'] || '0'),
-                        orderTotal: parseFloat(row['Order Total'] || '0'),
-                        discountValue: parseFloat(row['Discount Value'] || '0'),
-                        weight: parseFloat(row['Weight (KG)'] || '0'),
-                        chargedWeight: parseFloat(row['Charged Weight'] || '0'),
-                        codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
-                        remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
-                        codCharges: parseFloat(row['COD Charges'] || '0'),
-                        shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
-                        freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0')
-                      }
-                    );
-                  } catch (e) {
-                    console.error('Error adding document:', e);
+                  // Fix: Ensure row is an object before spreading
+                  if (row && typeof row === 'object') {
+                    try {
+                      await addDoc(
+                        collection(db, 'users', auth.currentUser!.uid, 'shippingData'),
+                        {
+                          ...row,
+                          // Convert date strings to Date objects
+                          shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
+                          uploadDate: serverTimestamp(),
+                          // Parse numeric values
+                          productQuantity: parseInt(row['Product Quantity'] || '0'),
+                          orderTotal: parseFloat(row['Order Total'] || '0'),
+                          discountValue: parseFloat(row['Discount Value'] || '0'),
+                          weight: parseFloat(row['Weight (KG)'] || '0'),
+                          chargedWeight: parseFloat(row['Charged Weight'] || '0'),
+                          codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
+                          remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
+                          codCharges: parseFloat(row['COD Charges'] || '0'),
+                          shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
+                          freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0')
+                        }
+                      );
+                    } catch (e) {
+                      console.error('Error adding document:', e);
+                    }
                   }
                 }
                 
