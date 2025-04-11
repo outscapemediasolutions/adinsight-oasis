@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/services/firebase";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { format } from "date-fns";
-import { RefreshCw, Upload } from "lucide-react";
+import { RefreshCw, Upload, RotateCcw } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import EmptyState from "./EmptyState";
 import { ShopifyAnalyticsSummary } from "./ShopifyAnalyticsSummary";
@@ -46,6 +45,7 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<ShopifyOrder[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [hasData, setHasData] = useState(false);
   
   useEffect(() => {
     if (!currentUser) return;
@@ -59,6 +59,11 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
     setIsLoading(true);
     try {
       const shopifyDataRef = collection(db, "users", currentUser.uid, "shopifyData");
+      
+      // First check if any data exists overall
+      const checkDataQuery = query(shopifyDataRef, limit(1));
+      const checkSnapshot = await getDocs(checkDataQuery);
+      setHasData(!checkSnapshot.empty);
       
       // Build query with optional date filters
       let q = query(shopifyDataRef, orderBy("createdAt", "desc"));
@@ -224,21 +229,38 @@ const ShopifyDashboard = ({ dateRange }: ShopifyDashboardProps) => {
     });
   };
   
+  const handleResetDateRange = () => {
+    // Navigate to the same page but without date filters
+    navigate("/shopify-analytics");
+  };
+  
   if (!isLoading && orders.length === 0) {
-    return (
-      <Card className="p-8 text-center border border-muted/20 bg-card/90 backdrop-blur-sm">
-        <h3 className="text-lg font-medium mb-2">
-          {dateRange.start && dateRange.end 
-            ? "No data available for the selected date range" 
-            : "No Shopify data available"}
-        </h3>
-        <p className="text-muted-foreground mb-4">Upload your Shopify sales report to see insights and analytics</p>
-        <Button onClick={handleUploadClick} className="bg-adpulse-green hover:bg-adpulse-green/90">
-          <Upload className="mr-2 h-4 w-4" />
-          Upload Shopify Data
-        </Button>
-      </Card>
-    );
+    // Handle different empty state scenarios
+    if (hasData && dateRange.start && dateRange.end) {
+      // If we have data overall but none in the selected date range
+      return (
+        <Card className="p-8 text-center border border-muted/20 bg-card/90 backdrop-blur-sm">
+          <h3 className="text-lg font-medium mb-2">No data available for the selected date range</h3>
+          <p className="text-muted-foreground mb-4">Try selecting a different date range or reset to view all data</p>
+          <Button onClick={handleResetDateRange} className="bg-white/10 hover:bg-white/20 text-white">
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reset Date Range
+          </Button>
+        </Card>
+      );
+    } else if (!hasData) {
+      // If no data at all, show upload button
+      return (
+        <Card className="p-8 text-center border border-muted/20 bg-card/90 backdrop-blur-sm">
+          <h3 className="text-lg font-medium mb-2">No Shopify data available</h3>
+          <p className="text-muted-foreground mb-4">Upload your Shopify sales report to see insights and analytics</p>
+          <Button onClick={handleUploadClick} className="bg-adpulse-green hover:bg-adpulse-green/90">
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Shopify Data
+          </Button>
+        </Card>
+      );
+    }
   }
   
   return (

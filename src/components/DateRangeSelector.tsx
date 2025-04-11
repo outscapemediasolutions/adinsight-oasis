@@ -82,16 +82,15 @@ const DateRangeSelector = ({ onDateRangeChange, startDate, endDate }: DateRangeP
         </PopoverContent>
       </Popover>
       
-      {(selectedRange.from || selectedRange.to) && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleReset}
-          className="bg-transparent border-white/20 hover:bg-white/5 text-white h-9"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleReset}
+        className="bg-transparent border-white/20 hover:bg-white/5 text-white h-9"
+        aria-label="Reset date range"
+      >
+        <RotateCcw className="h-4 w-4" />
+      </Button>
     </div>
   );
 };
