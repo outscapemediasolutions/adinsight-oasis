@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/services/auth";
-import { Moon, Sun, Menu, X, BarChart, Upload, User, LogOut, Users, Home } from "lucide-react";
+import { Moon, Sun, Menu, X, BarChart, Upload, User, LogOut, Users, Home, Truck } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +55,7 @@ const Navbar = ({ toggleDarkMode, isDarkMode }: NavbarProps) => {
     { path: "/", label: "Home", icon: <Home className="h-4 w-4 mr-2" /> },
     { path: "/dashboard", label: "Dashboard", icon: <BarChart className="h-4 w-4 mr-2" /> },
     { path: "/upload", label: "Upload Data", icon: <Upload className="h-4 w-4 mr-2" /> },
+    { path: "/shipping-analytics", label: "Shipping", icon: <Truck className="h-4 w-4 mr-2" /> },
     { path: "/team", label: "Team", icon: <Users className="h-4 w-4 mr-2" /> },
   ];
   

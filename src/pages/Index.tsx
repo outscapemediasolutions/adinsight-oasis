@@ -7,6 +7,8 @@ import { signOut } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Dashboard from "@/components/dashboard/Dashboard";
+import { Link } from "react-router-dom";
+import { Truck } from "lucide-react";
 
 const Index = () => {
   const { currentUser, userData } = useAuth();
@@ -33,6 +35,15 @@ const Index = () => {
           </span>
           <Button size="sm" onClick={handleSignOut}>Sign Out</Button>
         </div>
+      </div>
+      
+      <div className="mb-6">
+        <Link to="/shipping-analytics">
+          <Button variant="outline" className="flex gap-2">
+            <Truck className="h-4 w-4" /> 
+            Shipping Analytics
+          </Button>
+        </Link>
       </div>
       
       <Dashboard />

@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, FileUp, Home, LogOut, Settings, Users, UserCog, ShoppingBag } from "lucide-react";
+import { BarChart3, FileUp, Home, LogOut, Settings, Users, UserCog, ShoppingBag, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOut } from "@/services/auth";
@@ -21,6 +21,7 @@ const AppSidebar = () => {
     { icon: FileUp, label: "Data Upload", path: "/upload", access: "upload" },
     { icon: BarChart3, label: "Meta Ad Analytics", path: "/analytics", access: "analytics" },
     { icon: ShoppingBag, label: "Shopify Analytics", path: "/shopify-analytics", access: "analytics" },
+    { icon: Truck, label: "Shipping Analytics", path: "/shipping-analytics", access: "analytics" },
     { icon: Users, label: "Team", path: "/team", access: "team" },
     { icon: UserCog, label: "User Management", path: "/user-management", access: "userManagement" },
     { icon: Settings, label: "Settings", path: "/settings", access: "settings" },
