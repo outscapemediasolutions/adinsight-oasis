@@ -17,6 +17,7 @@ import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
 import ShopifyAnalytics from "./pages/ShopifyAnalytics";
+import ShippingAnalytics from "./pages/ShippingAnalytics";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,11 @@ const App = () => {
                 <Route path="shopify-analytics" element={
                   <ProtectedRoute requiredAccess="analytics">
                     <ShopifyAnalytics />
+                  </ProtectedRoute>
+                } />
+                <Route path="shipping-analytics" element={
+                  <ProtectedRoute requiredAccess="analytics">
+                    <ShippingAnalytics />
                   </ProtectedRoute>
                 } />
                 <Route path="team" element={
