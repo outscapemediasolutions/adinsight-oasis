@@ -6,9 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/services/firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-import { format, parseISO } from "date-fns";
-import { RefreshCw, Upload, RotateCcw, Package, TrendingUp } from "lucide-react";
+import { collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
+import { format } from "date-fns";
+import { RefreshCw, Upload, RotateCcw, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ShippingAnalyticsSummary } from "./ShippingAnalyticsSummary";
 import { ShippingCharts } from "./charts/ShippingCharts";
@@ -54,6 +54,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   useEffect(() => {
     if (!currentUser) return;
     
+    console.log("Fetching shipping data with date range:", dateRange);
     fetchShippingData();
   }, [currentUser, dateRange]);
   
@@ -62,26 +63,41 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
     
     setIsLoading(true);
     try {
+      console.log("Starting data fetch from Firestore...");
       const shippingDataRef = collection(db, "users", currentUser.uid, "shippingData");
       
       // First check if any data exists overall
       const checkDataQuery = query(shippingDataRef, limit(1));
       const checkSnapshot = await getDocs(checkDataQuery);
-      setHasData(!checkSnapshot.empty);
+      const hasAnyData = !checkSnapshot.empty;
+      console.log("Has any data:", hasAnyData);
+      setHasData(hasAnyData);
+      
+      if (!hasAnyData) {
+        setOrders([]);
+        setMetrics(null);
+        setIsLoading(false);
+        return;
+      }
       
       // Build query with optional date filters
-      let q = query(shippingDataRef, orderBy("shipDate", "desc"));
+      let q;
       
       if (dateRange.start && dateRange.end) {
+        console.log("Filtering by date range:", dateRange.start, "to", dateRange.end);
         q = query(
           shippingDataRef,
           where("shipDate", ">=", dateRange.start),
           where("shipDate", "<=", dateRange.end),
           orderBy("shipDate", "desc")
         );
+      } else {
+        console.log("No date range filter, fetching all data");
+        q = query(shippingDataRef, orderBy("shipDate", "desc"));
       }
       
       const querySnapshot = await getDocs(q);
+      console.log(`Fetched ${querySnapshot.size} documents from Firestore`);
       
       if (querySnapshot.empty) {
         setOrders([]);
@@ -95,47 +111,56 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       
       querySnapshot.forEach(doc => {
         const data = doc.data();
+        console.log("Processing document:", doc.id);
         
-        // Convert date strings to Date objects
+        // Convert date strings or Firestore timestamps to Date objects
         let shipDate: Date;
         try {
-          shipDate = data.shipDate instanceof Date 
-            ? data.shipDate 
-            : new Date(data["Ship Date"] || Date.now());
+          if (data.shipDate instanceof Timestamp) {
+            shipDate = data.shipDate.toDate();
+          } else if (data.shipDate instanceof Date) {
+            shipDate = data.shipDate;
+          } else if (typeof data.shipDate === 'string') {
+            shipDate = new Date(data.shipDate);
+          } else {
+            shipDate = new Date();
+          }
         } catch (e) {
+          console.error("Error processing date:", e);
           shipDate = new Date();
         }
         
         // Create order object
         const order: ShippingOrder = {
           id: doc.id,
-          orderId: data["Order ID"] || "",
-          trackingId: data["Tracking ID"] || "",
+          orderId: data.orderId || "",
+          trackingId: data.trackingId || "",
           shipDate,
-          status: data["Status"] || "",
-          productName: data["Product Name"] || "",
-          productCategory: data["Product Category"] || "",
-          productQuantity: parseInt(data["Product Quantity"] || "0"),
-          customerName: data["Customer Name"] || "",
-          customerEmail: data["Customer Email"] || "",
-          addressState: data["Address State"] || "",
-          addressCity: data["Address City"] || "",
-          paymentMethod: data["Payment Method"] || "",
-          orderTotal: parseFloat(data["Order Total"] || "0"),
-          discountValue: parseFloat(data["Discount Value"] || "0"),
-          weight: parseFloat(data["Weight (KG)"] || "0"),
-          chargedWeight: parseFloat(data["Charged Weight"] || "0"),
-          courierCompany: data["Courier Company"] || "",
-          codPayableAmount: parseFloat(data["COD Payble Amount"] || "0"),
-          remittedAmount: parseFloat(data["Remitted Amount"] || "0"),
-          codCharges: parseFloat(data["COD Charges"] || "0"),
-          shippingCharges: parseFloat(data["Shipping Charges"] || "0"),
-          freightTotalAmount: parseFloat(data["Freight Total Amount"] || "0")
+          status: data.status || "",
+          productName: data.productName || "",
+          productCategory: data.productCategory || "",
+          productQuantity: parseInt(data.productQuantity || "0"),
+          customerName: data.customerName || "",
+          customerEmail: data.customerEmail || "",
+          addressState: data.addressState || "",
+          addressCity: data.addressCity || "",
+          paymentMethod: data.paymentMethod || "",
+          orderTotal: parseFloat(data.orderTotal || "0"),
+          discountValue: parseFloat(data.discountValue || "0"),
+          weight: parseFloat(data.weight || "0"),
+          chargedWeight: parseFloat(data.chargedWeight || "0"),
+          courierCompany: data.courierCompany || "",
+          codPayableAmount: parseFloat(data.codPayableAmount || "0"),
+          remittedAmount: parseFloat(data.remittedAmount || "0"),
+          codCharges: parseFloat(data.codCharges || "0"),
+          shippingCharges: parseFloat(data.shippingCharges || "0"),
+          freightTotalAmount: parseFloat(data.freightTotalAmount || "0")
         };
         
         processedOrders.push(order);
       });
       
+      console.log(`Successfully processed ${processedOrders.length} orders`);
       setOrders(processedOrders);
       
       // Calculate metrics
@@ -150,6 +175,8 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   };
   
   const calculateMetrics = (orders: ShippingOrder[]) => {
+    console.log("Calculating metrics from", orders.length, "orders");
+    
     // 1. Order Volume and Revenue
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, order) => sum + order.orderTotal, 0);
@@ -268,7 +295,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
     const repeatRate = uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0;
     
     // Set metrics
-    setMetrics({
+    const calculatedMetrics = {
       totalOrders,
       totalRevenue,
       avgOrderValue,
@@ -292,10 +319,14 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
         repeatCustomers,
         repeatRate
       }
-    });
+    };
+    
+    console.log("Metrics calculated:", calculatedMetrics);
+    setMetrics(calculatedMetrics);
   };
 
   const handleRefresh = () => {
+    console.log("Manual refresh triggered");
     fetchShippingData();
   };
   
@@ -349,7 +380,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           disabled={isLoading}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
+          {isLoading ? "Loading..." : "Refresh"}
         </Button>
       </div>
       

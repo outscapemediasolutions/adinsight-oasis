@@ -48,20 +48,25 @@ const ShippingCSVUpload = ({
         header: true,
         preview: 1,
         complete: function(results) {
-          if (results.data && results.data.length > 0 && results.data[0]) {
-            // Fix: Ensure results.data[0] is an object before spreading
+          if (results.data && Array.isArray(results.data) && results.data.length > 0) {
             const firstRow = results.data[0];
             if (typeof firstRow === 'object' && firstRow !== null) {
               const headers = Object.keys(firstRow);
+              console.log("Detected headers:", headers);
               if (onHeadersDetected) {
                 onHeadersDetected(headers);
               }
             }
           }
+        },
+        error: function(error) {
+          console.error("Error parsing CSV headers:", error);
+          setUploadError('Failed to parse CSV headers. Please check file format.');
         }
       });
       
       setFile(selectedFile);
+      console.log("File selected:", selectedFile.name);
     }
   }, [onHeadersDetected]);
 
@@ -74,7 +79,10 @@ const ShippingCSVUpload = ({
   });
 
   const handleUpload = async () => {
-    if (!file || !auth.currentUser) return;
+    if (!file || !auth.currentUser) {
+      console.log("No file selected or user not authenticated");
+      return;
+    }
     
     onUploadStart();
     setIsLoading(true);
@@ -82,6 +90,7 @@ const ShippingCSVUpload = ({
     setUploadError('');
     
     try {
+      console.log("Starting upload process...");
       // Upload file to Firebase Storage
       const storageRef = ref(storage, `shipping_data/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
@@ -89,7 +98,8 @@ const ShippingCSVUpload = ({
       uploadTask.on(
         'state_changed',
         (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 50); // Up to 50% for file upload
+          console.log(`Upload progress: ${progress}%`);
           setProgress(progress);
         },
         (error) => {
@@ -102,17 +112,21 @@ const ShippingCSVUpload = ({
         async () => {
           // Get download URL
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          console.log("File uploaded successfully, URL:", downloadURL);
           
           // Parse CSV data
           Papa.parse(file, {
             header: true,
             complete: async function(results) {
               try {
+                console.log(`Parsed ${results.data.length} rows from CSV`);
                 // Create a batch for more efficient writes
                 const batch = writeBatch(db);
                 
                 // Add metadata to Firestore
-                const metaDocRef = doc(collection(db, 'users', auth.currentUser!.uid, 'shippingData_meta'));
+                const userId = auth.currentUser!.uid;
+                const metaDocRef = doc(collection(db, 'users', userId, 'shippingData_meta'));
+                
                 batch.set(metaDocRef, {
                   filename: file.name,
                   uploadDate: serverTimestamp(),
@@ -121,16 +135,19 @@ const ShippingCSVUpload = ({
                   downloadURL
                 });
                 
+                console.log("Created metadata document with ID:", metaDocRef.id);
+                
                 // Process and add rows to Firestore
-                const shippingCollection = collection(db, 'users', auth.currentUser!.uid, 'shippingData');
+                const shippingCollection = collection(db, 'users', userId, 'shippingData');
                 
                 // Process only valid rows
                 const validRows = results.data.filter((row: any) => 
                   row && 
                   typeof row === 'object' && 
-                  Object.keys(row).length > 0 &&
-                  row['Order ID'] // Ensure at least Order ID exists as a basic validity check
+                  Object.keys(row).length > 0
                 );
+                
+                console.log(`Processing ${validRows.length} valid rows`);
                 
                 // Process in chunks due to Firestore batch limits (max 500 operations)
                 const chunkSize = 400; // Keep under Firestore's 500 limit to be safe
@@ -142,7 +159,6 @@ const ShippingCSVUpload = ({
                   if (typeof row === 'object' && row !== null) {
                     const docRef = doc(shippingCollection);
                     batch.set(docRef, {
-                      // Safely parse and store the shipping data
                       orderId: row['Order ID'] || '',
                       trackingId: row['Tracking ID'] || '',
                       shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
@@ -184,6 +200,7 @@ const ShippingCSVUpload = ({
                 // Commit the first batch
                 await batch.commit();
                 console.log(`Successfully uploaded first batch of ${firstChunk.length} records`);
+                setProgress(60); // 60% progress after first batch
                 
                 // Process any remaining chunks
                 const remaining = validRows.slice(chunkSize);
@@ -237,17 +254,17 @@ const ShippingCSVUpload = ({
                   
                   await nextBatch.commit();
                   processedCount += chunk.length;
-                  const updatedProgress = Math.min(95, Math.round((processedCount / validRows.length) * 95));
+                  const updatedProgress = Math.min(95, 60 + Math.round((processedCount / validRows.length) * 35));
                   setProgress(updatedProgress);
-                  console.log(`Successfully uploaded batch ${i/chunkSize + 2} with ${chunk.length} records`);
+                  console.log(`Successfully uploaded batch ${Math.floor(i/chunkSize) + 2} with ${chunk.length} records`);
                 }
                 
+                console.log("All data successfully uploaded to Firestore");
                 setProgress(100);
                 setUploadSuccess(true);
                 setIsLoading(false);
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
-                console.log('Upload completed successfully');
               } catch (err) {
                 console.error('Error storing CSV data:', err);
                 setUploadError('Failed to process data. Please try again.');
@@ -315,7 +332,13 @@ const ShippingCSVUpload = ({
           </div>
 
           {isLoading && (
-            <Progress value={progress} className="h-2" />
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>Uploading...</span>
+                <span>{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
           )}
 
           {uploadError && (
@@ -328,7 +351,7 @@ const ShippingCSVUpload = ({
               disabled={isLoading || !file || uploadSuccess}
               className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] hover:from-[#7E69AB] hover:to-[#9b87f5] text-white"
             >
-              {isLoading ? 'Uploading...' : 'Upload File'}
+              {isLoading ? `Uploading (${progress}%)` : 'Upload File'}
             </Button>
           </div>
         </div>

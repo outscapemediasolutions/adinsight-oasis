@@ -28,6 +28,7 @@ const ShippingAnalytics = () => {
   useEffect(() => {
     // Check for tab to show from navigation state
     if (location.state && location.state.defaultTab) {
+      console.log("Setting active tab from location state:", location.state.defaultTab);
       setActiveTab(location.state.defaultTab);
     }
   }, [location.state]);
@@ -70,11 +71,13 @@ const ShippingAnalytics = () => {
   };
   
   const handleUploadStart = () => {
+    console.log("Upload start handler triggered");
     setUploadSuccess(false);
     setUploadFilename(null);
   };
   
   const handleHeadersDetected = (headers: string[]) => {
+    console.log("CSV Headers detected:", headers);
     setCsvHeaders(headers);
     
     // Check if all required headers are present
@@ -88,15 +91,19 @@ const ShippingAnalytics = () => {
     );
     
     if (missingHeaders.length > 0) {
+      console.log("Missing required headers:", missingHeaders);
       setShowColumnMappingDialog(true);
     }
   };
   
   const handleUploadComplete = (success: boolean, filename?: string) => {
+    console.log("Upload complete handler triggered:", success, filename);
     setUploadSuccess(success);
     setUploadFilename(filename || null);
     if (success) {
       handleUploadSuccess();
+      // Switch to dashboard tab to show the uploaded data
+      setActiveTab("dashboard");
     }
   };
 
@@ -106,6 +113,7 @@ const ShippingAnalytics = () => {
   };
   
   const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
+    console.log("Date range changed:", startDate, endDate);
     setDateRange({ start: startDate, end: endDate });
   };
   
