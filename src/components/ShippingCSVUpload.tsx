@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { storage, db, auth } from "@/services/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, writeBatch, doc, Timestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 
 interface ShippingCSVUploadProps {
@@ -48,16 +48,33 @@ const ShippingCSVUpload = ({
       
       console.log("File selected:", selectedFile.name);
       
-      // Parse CSV headers
+      // Parse CSV headers to validate the file format
       Papa.parse(selectedFile, {
         header: true,
-        preview: 1,
+        preview: 1, // Only parse the first row to get headers
+        skipEmptyLines: true,
         complete: function(results) {
           if (results.data && Array.isArray(results.data) && results.data.length > 0) {
             const firstRow = results.data[0];
             if (typeof firstRow === 'object' && firstRow !== null) {
               const headers = Object.keys(firstRow);
               console.log("Detected headers:", headers);
+              
+              // Validate required headers
+              const requiredHeaders = [
+                "Order ID", "Ship Date", "Status", "Product Name", 
+                "Product Quantity", "Order Total"
+              ];
+              
+              const missingHeaders = requiredHeaders.filter(
+                header => !headers.some(h => h.toLowerCase() === header.toLowerCase())
+              );
+              
+              if (missingHeaders.length > 0) {
+                console.warn("Missing required headers:", missingHeaders);
+                toast.warning(`Missing required headers: ${missingHeaders.join(", ")}`);
+              }
+              
               if (onHeadersDetected) {
                 onHeadersDetected(headers);
               }
@@ -98,59 +115,61 @@ const ShippingCSVUpload = ({
     
     try {
       console.log("Starting upload process...");
-      // Upload file to Firebase Storage
+      
+      // First, store the file in Firebase Storage as backup
       const storageRef = ref(storage, `shipping_data/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
       
       uploadTask.on(
         'state_changed',
         (snapshot) => {
-          const uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 50); // Up to 50% for file upload
+          const uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 20); // First 20% for file upload
           console.log(`Upload progress: ${uploadProgress}%`);
           setProgress(uploadProgress);
           setProcessingStatus(`Uploading file: ${uploadProgress}%`);
         },
         (error) => {
           console.error('Upload failed:', error);
-          setUploadError('Upload failed. Please try again.');
+          setUploadError('File upload failed. Please try again.');
           setIsLoading(false);
           setProcessingStatus('');
           onUploadComplete(false);
-          toast.error('Upload failed. Please try again.');
+          toast.error('File upload failed. Please try again.');
         },
         async () => {
-          // Get download URL
+          // Get download URL after upload completes
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           console.log("File uploaded successfully, URL:", downloadURL);
-          setProcessingStatus('File uploaded. Processing data...');
+          setProcessingStatus('File uploaded. Starting CSV processing...');
+          setProgress(25);
           
           // Parse CSV data
           Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
+            dynamicTyping: true, // Auto-convert strings to numbers where appropriate
             complete: async function(results) {
               try {
                 const parsedData = results.data;
                 console.log(`Parsed ${parsedData.length} rows from CSV`);
-                setProcessingStatus(`Processing ${parsedData.length} records...`);
-                setProgress(60);
+                setProcessingStatus(`Parsed ${parsedData.length} records. Processing data...`);
+                setProgress(40);
                 
+                // Report any parsing errors
                 if (results.errors && results.errors.length > 0) {
                   console.warn("CSV parsing had some errors:", results.errors);
+                  toast.warning(`CSV parsing had ${results.errors.length} errors. Some data may be incomplete.`);
                 }
                 
                 if (parsedData.length === 0) {
                   throw new Error("No valid data found in the CSV file");
                 }
                 
-                // Create a batch for more efficient writes
-                const batch = writeBatch(db);
-                
-                // Add metadata to Firestore
+                // Create a metadata document first
                 const userId = auth.currentUser!.uid;
-                const metaDocRef = doc(collection(db, 'users', userId, 'shippingData_meta'));
+                const metaRef = collection(db, 'users', userId, 'shippingData_meta');
                 
-                batch.set(metaDocRef, {
+                const metaDoc = await addDoc(metaRef, {
                   filename: file.name,
                   uploadDate: serverTimestamp(),
                   fileSize: file.size,
@@ -158,199 +177,141 @@ const ShippingCSVUpload = ({
                   downloadURL
                 });
                 
-                console.log("Created metadata document with ID:", metaDocRef.id);
+                console.log("Created metadata document with ID:", metaDoc.id);
+                setProgress(50);
+                setProcessingStatus('Preparing data for database...');
                 
-                // Process and add rows to Firestore
+                // Create batch for data upload
+                const batch = writeBatch(db);
                 const shippingCollection = collection(db, 'users', userId, 'shippingData');
                 
-                // Process only valid rows
-                const validRows = parsedData.filter((row: any) => 
-                  row && 
-                  typeof row === 'object' && 
-                  Object.keys(row).length > 0
-                );
+                // Process valid rows in smaller batches (Firestore batch limit is 500 operations)
+                const batchSize = 400; // Keep under Firestore's limit
+                let batchCount = 0;
+                let recordCount = 0;
                 
-                console.log(`Processing ${validRows.length} valid rows`);
-                
-                // Process in chunks due to Firestore batch limits (max 500 operations)
-                const chunkSize = 400; // Keep under Firestore's 500 limit to be safe
-                
-                // Process first chunk directly in this batch
-                const firstChunk = validRows.slice(0, chunkSize);
-                
-                for (let i = 0; i < firstChunk.length; i++) {
-                  const row = firstChunk[i];
-                  if (typeof row === 'object' && row !== null) {
-                    const docRef = doc(shippingCollection);
-                    
-                    // Convert shipDate properly
-                    let shipDate = null;
-                    if (row['Ship Date']) {
-                      try {
-                        shipDate = new Date(row['Ship Date']);
-                        // Check if date is valid
-                        if (isNaN(shipDate.getTime())) {
-                          console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
-                          shipDate = null;
-                        }
-                      } catch (e) {
-                        console.warn(`Error parsing date for row ${i}:`, e);
-                        shipDate = null;
-                      }
-                    }
-                    
-                    batch.set(docRef, {
-                      orderId: row['Order ID'] || '',
-                      trackingId: row['Tracking ID'] || '',
-                      shipDate: shipDate,
-                      channel: row['Channel'] || '',
-                      status: row['Status'] || '',
-                      channelSKU: row['Channel SKU'] || '',
-                      masterSKU: row['Master SKU'] || '',
-                      productName: row['Product Name'] || '',
-                      productCategory: row['Product Category'] || '',
-                      productQuantity: parseInt(row['Product Quantity'] || '0'),
-                      customerName: row['Customer Name'] || '',
-                      customerEmail: row['Customer Email'] || '',
-                      customerMobile: row['Customer Mobile'] || '',
-                      addressLine1: row['Address Line 1'] || '',
-                      addressLine2: row['Address Line 2'] || '',
-                      addressCity: row['Address City'] || '',
-                      addressState: row['Address State'] || '',
-                      addressPincode: row['Address Pincode'] || '',
-                      paymentMethod: row['Payment Method'] || '',
-                      productPrice: parseFloat(row['Product Price'] || '0'),
-                      orderTotal: parseFloat(row['Order Total'] || '0'),
-                      discountValue: parseFloat(row['Discount Value'] || '0'),
-                      weight: parseFloat(row['Weight (KG)'] || '0'),
-                      chargedWeight: parseFloat(row['Charged Weight'] || '0'),
-                      courierCompany: row['Courier Company'] || '',
-                      pickupLocationId: row['Pickup Location ID'] || '',
-                      codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
-                      remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
-                      codCharges: parseFloat(row['COD Charges'] || '0'),
-                      shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
-                      freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0'),
-                      pickupPincode: row['Pickup Pincode'] || '',
-                      uploadDate: serverTimestamp(),
-                      uploadId: metaDocRef.id
-                    });
-                    
-                    if (i % 50 === 0) {
-                      const batchProgress = Math.min(70, 60 + Math.round((i / firstChunk.length) * 10));
+                for (let i = 0; i < parsedData.length; i++) {
+                  // Commit the current batch and create a new one if we've reached the limit
+                  if (i > 0 && i % batchSize === 0) {
+                    try {
+                      setProcessingStatus(`Saving batch ${++batchCount} to database...`);
+                      await batch.commit();
+                      console.log(`Committed batch ${batchCount}`);
+                      
+                      // Calculate overall progress (50% for initial steps + up to 45% for batches)
+                      const batchProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
                       setProgress(batchProgress);
-                      setProcessingStatus(`Processing first batch: ${Math.round((i / firstChunk.length) * 100)}%`);
+                      
+                      // Create a new batch for the next set of records
+                      batch = writeBatch(db);
+                    } catch (batchError) {
+                      console.error(`Error committing batch ${batchCount}:`, batchError);
+                      toast.error(`Error saving batch ${batchCount}. Some data may be missing.`);
+                      // Continue with next batch despite errors
                     }
                   }
-                }
-                
-                // Commit the first batch
-                try {
-                  console.log("Committing first batch to Firestore...");
-                  setProcessingStatus("Saving data to database...");
-                  await batch.commit();
-                  console.log(`Successfully uploaded first batch of ${firstChunk.length} records`);
-                } catch (batchError) {
-                  console.error("Error committing first batch:", batchError);
-                  throw new Error(`Failed to save data: ${batchError.message}`);
-                }
-                
-                setProgress(75);
-                
-                // Process any remaining chunks
-                const remaining = validRows.slice(chunkSize);
-                let processedCount = firstChunk.length;
-                
-                for (let i = 0; i < remaining.length; i += chunkSize) {
-                  setProcessingStatus(`Processing additional batches: ${Math.round((processedCount / validRows.length) * 100)}%`);
-                  const nextBatch = writeBatch(db);
-                  const chunk = remaining.slice(i, i + chunkSize);
                   
-                  for (let j = 0; j < chunk.length; j++) {
-                    const row = chunk[j];
-                    if (typeof row === 'object' && row !== null) {
-                      const docRef = doc(shippingCollection);
-                      
-                      // Convert shipDate properly
-                      let shipDate = null;
-                      if (row['Ship Date']) {
-                        try {
-                          shipDate = new Date(row['Ship Date']);
-                          // Check if date is valid
-                          if (isNaN(shipDate.getTime())) {
-                            shipDate = null;
-                          }
-                        } catch (e) {
-                          shipDate = null;
-                        }
+                  const row = parsedData[i];
+                  if (typeof row !== 'object' || row === null) {
+                    console.warn(`Skipping invalid row at index ${i}`);
+                    continue;
+                  }
+                  
+                  // Create a document reference with a unique ID
+                  const docRef = doc(shippingCollection);
+                  
+                  // Convert shipDate to a proper timestamp if it exists
+                  let shipDate = null;
+                  if (row['Ship Date']) {
+                    try {
+                      const dateValue = new Date(row['Ship Date']);
+                      // Check if parsed date is valid
+                      if (!isNaN(dateValue.getTime())) {
+                        shipDate = Timestamp.fromDate(dateValue);
+                      } else {
+                        console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
                       }
-                      
-                      nextBatch.set(docRef, {
-                        orderId: row['Order ID'] || '',
-                        trackingId: row['Tracking ID'] || '',
-                        shipDate: shipDate,
-                        channel: row['Channel'] || '',
-                        status: row['Status'] || '',
-                        channelSKU: row['Channel SKU'] || '',
-                        masterSKU: row['Master SKU'] || '',
-                        productName: row['Product Name'] || '',
-                        productCategory: row['Product Category'] || '',
-                        productQuantity: parseInt(row['Product Quantity'] || '0'),
-                        customerName: row['Customer Name'] || '',
-                        customerEmail: row['Customer Email'] || '',
-                        customerMobile: row['Customer Mobile'] || '',
-                        addressLine1: row['Address Line 1'] || '',
-                        addressLine2: row['Address Line 2'] || '',
-                        addressCity: row['Address City'] || '',
-                        addressState: row['Address State'] || '',
-                        addressPincode: row['Address Pincode'] || '',
-                        paymentMethod: row['Payment Method'] || '',
-                        productPrice: parseFloat(row['Product Price'] || '0'),
-                        orderTotal: parseFloat(row['Order Total'] || '0'),
-                        discountValue: parseFloat(row['Discount Value'] || '0'),
-                        weight: parseFloat(row['Weight (KG)'] || '0'),
-                        chargedWeight: parseFloat(row['Charged Weight'] || '0'),
-                        courierCompany: row['Courier Company'] || '',
-                        pickupLocationId: row['Pickup Location ID'] || '',
-                        codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
-                        remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
-                        codCharges: parseFloat(row['COD Charges'] || '0'),
-                        shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
-                        freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0'),
-                        pickupPincode: row['Pickup Pincode'] || '',
-                        uploadDate: serverTimestamp(),
-                        uploadId: metaDocRef.id
-                      });
+                    } catch (e) {
+                      console.warn(`Error parsing date for row ${i}:`, e);
                     }
                   }
                   
-                  try {
-                    await nextBatch.commit();
-                    processedCount += chunk.length;
-                    const updatedProgress = Math.min(95, 75 + Math.round((processedCount / validRows.length) * 20));
-                    setProgress(updatedProgress);
-                    console.log(`Successfully uploaded batch ${Math.floor(i/chunkSize) + 2} with ${chunk.length} records`);
-                  } catch (batchError) {
-                    console.error(`Error committing batch ${Math.floor(i/chunkSize) + 2}:`, batchError);
-                    // Continue processing despite errors in additional batches
+                  // Create document data, ensuring all fields have proper types
+                  batch.set(docRef, {
+                    orderId: String(row['Order ID'] || ''),
+                    trackingId: String(row['Tracking ID'] || ''),
+                    shipDate: shipDate,
+                    channel: String(row['Channel'] || ''),
+                    status: String(row['Status'] || ''),
+                    channelSKU: String(row['Channel SKU'] || ''),
+                    masterSKU: String(row['Master SKU'] || ''),
+                    productName: String(row['Product Name'] || ''),
+                    productCategory: String(row['Product Category'] || ''),
+                    productQuantity: Number(row['Product Quantity'] || 0),
+                    customerName: String(row['Customer Name'] || ''),
+                    customerEmail: String(row['Customer Email'] || ''),
+                    customerMobile: String(row['Customer Mobile'] || ''),
+                    addressLine1: String(row['Address Line 1'] || ''),
+                    addressLine2: String(row['Address Line 2'] || ''),
+                    addressCity: String(row['Address City'] || ''),
+                    addressState: String(row['Address State'] || ''),
+                    addressPincode: String(row['Address Pincode'] || ''),
+                    paymentMethod: String(row['Payment Method'] || ''),
+                    productPrice: Number(row['Product Price'] || 0),
+                    orderTotal: Number(row['Order Total'] || 0),
+                    discountValue: Number(row['Discount Value'] || 0),
+                    weight: Number(row['Weight (KG)'] || 0),
+                    chargedWeight: Number(row['Charged Weight'] || 0),
+                    courierCompany: String(row['Courier Company'] || ''),
+                    pickupLocationId: String(row['Pickup Location ID'] || ''),
+                    codPayableAmount: Number(row['COD Payble Amount'] || 0),
+                    remittedAmount: Number(row['Remitted Amount'] || 0),
+                    codCharges: Number(row['COD Charges'] || 0),
+                    shippingCharges: Number(row['Shipping Charges'] || 0),
+                    freightTotalAmount: Number(row['Freight Total Amount'] || 0),
+                    pickupPincode: String(row['Pickup Pincode'] || ''),
+                    uploadDate: serverTimestamp(),
+                    uploadId: metaDoc.id
+                  });
+                  
+                  recordCount++;
+                  
+                  // Update UI progress every few records for smoother experience
+                  if (i % 20 === 0) {
+                    const itemProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
+                    setProgress(itemProgress);
+                    setProcessingStatus(`Processing data: ${Math.round((i / parsedData.length) * 100)}%`);
                   }
                 }
                 
-                console.log("All data successfully uploaded to Firestore");
-                setProcessingStatus('Finalizing...');
+                // Commit any remaining records in the last batch
+                if (recordCount % batchSize !== 0) {
+                  try {
+                    setProcessingStatus('Saving final records to database...');
+                    await batch.commit();
+                    console.log('Committed final batch');
+                  } catch (batchError) {
+                    console.error('Error committing final batch:', batchError);
+                    toast.error('Error saving final batch. Some data may be missing.');
+                  }
+                }
+                
+                // Finalize the upload
                 setProgress(100);
+                setProcessingStatus('Upload complete!');
                 setUploadSuccess(true);
                 setIsLoading(false);
+                console.log(`Successfully uploaded ${recordCount} records to Firestore`);
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
                 
-                // Navigate to dashboard automatically after 1 second
+                // Navigate to the dashboard automatically after a short delay
                 setTimeout(() => {
                   window.location.href = '/shipping-analytics';
-                }, 1000);
+                }, 1500);
                 
-              } catch (err) {
-                console.error('Error storing CSV data:', err);
+              } catch (err: any) {
+                console.error('Error processing CSV data:', err);
                 setUploadError(`Failed to process data: ${err.message}`);
                 setIsLoading(false);
                 setProcessingStatus('');
@@ -358,7 +319,7 @@ const ShippingCSVUpload = ({
                 toast.error(`Failed to process data: ${err.message}`);
               }
             },
-            error: function(err) {
+            error: function(err: any) {
               console.error('Error parsing CSV:', err);
               setUploadError(`Failed to parse CSV: ${err.message}`);
               setIsLoading(false);
@@ -369,8 +330,8 @@ const ShippingCSVUpload = ({
           });
         }
       );
-    } catch (error) {
-      console.error('Error uploading file:', error);
+    } catch (error: any) {
+      console.error('Error starting upload:', error);
       setUploadError(`Upload failed: ${error.message}`);
       setIsLoading(false);
       setProcessingStatus('');
@@ -421,7 +382,7 @@ const ShippingCSVUpload = ({
           {isLoading && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span>{processingStatus || "Uploading..."}</span>
+                <span>{processingStatus || "Processing..."}</span>
                 <span>{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />

@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/services/firebase";
 import { collection, query, where, getDocs, orderBy, limit, Timestamp, DocumentData } from "firebase/firestore";
 import { format } from "date-fns";
-import { RefreshCw, Upload, RotateCcw, Package } from "lucide-react";
+import { RefreshCw, Upload, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ShippingAnalyticsSummary } from "./ShippingAnalyticsSummary";
 import { ShippingCharts } from "./charts/ShippingCharts";
@@ -44,7 +44,7 @@ export interface ShippingOrder {
   freightTotalAmount: number;
 }
 
-interface ShippingDocumentData {
+export interface ShippingDocumentData extends DocumentData {
   orderId?: string;
   trackingId?: string;
   shipDate?: Timestamp | Date | string;
@@ -111,10 +111,14 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       
       if (dateRange.start && dateRange.end) {
         console.log("Filtering by date range:", dateRange.start, "to", dateRange.end);
+        // Convert JavaScript Date objects to Firestore Timestamps
+        const startTimestamp = Timestamp.fromDate(dateRange.start);
+        const endTimestamp = Timestamp.fromDate(dateRange.end);
+        
         q = query(
           shippingDataRef,
-          where("shipDate", ">=", dateRange.start),
-          where("shipDate", "<=", dateRange.end),
+          where("shipDate", ">=", startTimestamp),
+          where("shipDate", "<=", endTimestamp),
           orderBy("shipDate", "desc")
         );
       } else {
@@ -149,33 +153,34 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           } else if (typeof data.shipDate === 'string') {
             shipDate = new Date(data.shipDate);
           } else {
-            shipDate = new Date();
+            console.warn("Invalid shipDate format for document:", doc.id);
+            shipDate = new Date(); // Fallback to current date
           }
         } catch (e) {
           console.error("Error processing date:", e);
-          shipDate = new Date();
+          shipDate = new Date(); // Fallback to current date
         }
         
         // Create order object with proper type conversions
         const order: ShippingOrder = {
           id: doc.id,
-          orderId: data.orderId || "",
-          trackingId: data.trackingId || "",
+          orderId: String(data.orderId || ""),
+          trackingId: String(data.trackingId || ""),
           shipDate,
-          status: data.status || "",
-          productName: data.productName || "",
-          productCategory: data.productCategory || "",
+          status: String(data.status || ""),
+          productName: String(data.productName || ""),
+          productCategory: String(data.productCategory || ""),
           productQuantity: typeof data.productQuantity === 'string' ? parseInt(data.productQuantity) : Number(data.productQuantity || 0),
-          customerName: data.customerName || "",
-          customerEmail: data.customerEmail || "",
-          addressState: data.addressState || "",
-          addressCity: data.addressCity || "",
-          paymentMethod: data.paymentMethod || "",
+          customerName: String(data.customerName || ""),
+          customerEmail: String(data.customerEmail || ""),
+          addressState: String(data.addressState || ""),
+          addressCity: String(data.addressCity || ""),
+          paymentMethod: String(data.paymentMethod || ""),
           orderTotal: typeof data.orderTotal === 'string' ? parseFloat(data.orderTotal) : Number(data.orderTotal || 0),
           discountValue: typeof data.discountValue === 'string' ? parseFloat(data.discountValue) : Number(data.discountValue || 0),
           weight: typeof data.weight === 'string' ? parseFloat(data.weight) : Number(data.weight || 0),
           chargedWeight: typeof data.chargedWeight === 'string' ? parseFloat(data.chargedWeight) : Number(data.chargedWeight || 0),
-          courierCompany: data.courierCompany || "",
+          courierCompany: String(data.courierCompany || ""),
           codPayableAmount: typeof data.codPayableAmount === 'string' ? parseFloat(data.codPayableAmount) : Number(data.codPayableAmount || 0),
           remittedAmount: typeof data.remittedAmount === 'string' ? parseFloat(data.remittedAmount) : Number(data.remittedAmount || 0),
           codCharges: typeof data.codCharges === 'string' ? parseFloat(data.codCharges) : Number(data.codCharges || 0),
