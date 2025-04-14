@@ -11,7 +11,8 @@ interface ShippingAnalyticsSummaryProps {
 }
 
 export const ShippingAnalyticsSummary = ({ metrics, isLoading }: ShippingAnalyticsSummaryProps) => {
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return 'N/A';
     return new Intl.NumberFormat('en-IN', { 
       style: 'currency', 
       currency: 'INR',
@@ -19,11 +20,13 @@ export const ShippingAnalyticsSummary = ({ metrics, isLoading }: ShippingAnalyti
     }).format(value);
   };
   
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return '0';
     return new Intl.NumberFormat('en-IN').format(value);
   };
   
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return '0%';
     return new Intl.NumberFormat('en-IN', { 
       style: 'percent', 
       minimumFractionDigits: 1,
@@ -109,8 +112,8 @@ export const ShippingAnalyticsSummary = ({ metrics, isLoading }: ShippingAnalyti
             <div className="text-2xl font-bold">
               {metrics && metrics.courierPerformance && metrics.courierPerformance.length > 0
                 ? formatPercent(metrics.courierPerformance.reduce((sum: number, courier: any) => 
-                    sum + (courier.deliveryRate * courier.total), 0) / 
-                    metrics.courierPerformance.reduce((sum: number, courier: any) => sum + courier.total, 0))
+                    sum + ((courier.deliveryRate || 0) * (courier.total || 0)), 0) / 
+                    metrics.courierPerformance.reduce((sum: number, courier: any) => sum + (courier.total || 0), 0))
                 : '0%'
               }
             </div>

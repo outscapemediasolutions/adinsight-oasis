@@ -29,6 +29,63 @@ const ShippingCSVUpload = ({
   const [uploadError, setUploadError] = useState('');
   const [processingStatus, setProcessingStatus] = useState('');
 
+  // Helper function to clean data and handle missing values
+  const cleanData = (data: any) => {
+    if (!data) return null;
+    
+    // Clone the object to avoid modifying the original
+    const cleaned: any = { ...data };
+    
+    // Required fields validation
+    const requiredFields = ["orderId", "shipDate", "productQuantity"];
+    const missingRequired = requiredFields.filter(field => 
+      !cleaned[field] || cleaned[field] === "" || cleaned[field] === "N/A"
+    );
+    
+    if (missingRequired.length > 0) {
+      console.warn("Missing required fields:", missingRequired);
+    }
+    
+    // Clean numerical fields (replace empty, N/A, undefined with 0)
+    const numericalFields = [
+      "productQuantity", "productPrice", "orderTotal", "discountValue", 
+      "weight", "chargedWeight", "codPayableAmount", "remittedAmount", 
+      "codCharges", "shippingCharges", "freightTotalAmount"
+    ];
+    
+    numericalFields.forEach(field => {
+      const value = cleaned[field];
+      if (value === "" || value === "N/A" || value === undefined || value === null) {
+        cleaned[field] = 0;
+        console.warn(`Replaced missing value with 0 for ${field}`);
+      } else if (typeof value === 'string') {
+        // Convert string numbers to actual numbers
+        cleaned[field] = parseFloat(value) || 0;
+      }
+    });
+    
+    // Clean string fields (replace empty, N/A, undefined with empty string)
+    const stringFields = [
+      "trackingId", "channel", "status", "channelSKU", "masterSKU",
+      "productName", "productCategory", "customerName", "customerEmail",
+      "customerMobile", "addressLine1", "addressLine2", "addressCity",
+      "addressState", "addressPincode", "paymentMethod", "courierCompany",
+      "pickupLocationId", "pickupPincode"
+    ];
+    
+    stringFields.forEach(field => {
+      const value = cleaned[field];
+      if (value === "" || value === "N/A" || value === undefined || value === null) {
+        cleaned[field] = "";
+        console.warn(`Replaced missing value with empty string for ${field}`);
+      } else {
+        cleaned[field] = String(value);
+      }
+    });
+    
+    return cleaned;
+  };
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
     
@@ -143,11 +200,11 @@ const ShippingCSVUpload = ({
           setProcessingStatus('File uploaded. Starting CSV processing...');
           setProgress(25);
           
-          // Parse CSV data
+          // Parse CSV data with enhanced error handling
           Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
-            dynamicTyping: true, // Auto-convert strings to numbers where appropriate
+            dynamicTyping: false, // Keep as strings until we process them
             complete: async function(results) {
               try {
                 const parsedData = results.data;
@@ -181,21 +238,20 @@ const ShippingCSVUpload = ({
                 setProgress(50);
                 setProcessingStatus('Preparing data for database...');
                 
-                // Create batch for data upload
-                const batch = writeBatch(db);
-                const shippingCollection = collection(db, 'users', userId, 'shippingData');
-                
-                // Process valid rows in smaller batches (Firestore batch limit is 500 operations)
+                // Process data in batches to avoid Firestore limits
                 const batchSize = 400; // Keep under Firestore's limit
+                let currentBatch = writeBatch(db);
                 let batchCount = 0;
                 let recordCount = 0;
+                
+                const shippingCollection = collection(db, 'users', userId, 'shippingData');
                 
                 for (let i = 0; i < parsedData.length; i++) {
                   // Commit the current batch and create a new one if we've reached the limit
                   if (i > 0 && i % batchSize === 0) {
                     try {
                       setProcessingStatus(`Saving batch ${++batchCount} to database...`);
-                      await batch.commit();
+                      await currentBatch.commit();
                       console.log(`Committed batch ${batchCount}`);
                       
                       // Calculate overall progress (50% for initial steps + up to 45% for batches)
@@ -203,7 +259,7 @@ const ShippingCSVUpload = ({
                       setProgress(batchProgress);
                       
                       // Create a new batch for the next set of records
-                      batch = writeBatch(db);
+                      currentBatch = writeBatch(db);
                     } catch (batchError) {
                       console.error(`Error committing batch ${batchCount}:`, batchError);
                       toast.error(`Error saving batch ${batchCount}. Some data may be missing.`);
@@ -220,34 +276,17 @@ const ShippingCSVUpload = ({
                   // Create a document reference with a unique ID
                   const docRef = doc(shippingCollection);
                   
-                  // Convert shipDate to a proper timestamp if it exists
-                  let shipDate = null;
-                  if (row['Ship Date']) {
-                    try {
-                      const dateValue = new Date(row['Ship Date']);
-                      // Check if parsed date is valid
-                      if (!isNaN(dateValue.getTime())) {
-                        shipDate = Timestamp.fromDate(dateValue);
-                      } else {
-                        console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
-                      }
-                    } catch (e) {
-                      console.warn(`Error parsing date for row ${i}:`, e);
-                    }
-                  }
-                  
-                  // Create document data, ensuring all fields have proper types
-                  batch.set(docRef, {
+                  // Map CSV column names to our database field names and clean up data
+                  const rowData: any = {
                     orderId: String(row['Order ID'] || ''),
                     trackingId: String(row['Tracking ID'] || ''),
-                    shipDate: shipDate,
                     channel: String(row['Channel'] || ''),
                     status: String(row['Status'] || ''),
                     channelSKU: String(row['Channel SKU'] || ''),
                     masterSKU: String(row['Master SKU'] || ''),
                     productName: String(row['Product Name'] || ''),
                     productCategory: String(row['Product Category'] || ''),
-                    productQuantity: Number(row['Product Quantity'] || 0),
+                    productQuantity: row['Product Quantity'] ? Number(row['Product Quantity']) : 0,
                     customerName: String(row['Customer Name'] || ''),
                     customerEmail: String(row['Customer Email'] || ''),
                     customerMobile: String(row['Customer Mobile'] || ''),
@@ -257,23 +296,50 @@ const ShippingCSVUpload = ({
                     addressState: String(row['Address State'] || ''),
                     addressPincode: String(row['Address Pincode'] || ''),
                     paymentMethod: String(row['Payment Method'] || ''),
-                    productPrice: Number(row['Product Price'] || 0),
-                    orderTotal: Number(row['Order Total'] || 0),
-                    discountValue: Number(row['Discount Value'] || 0),
-                    weight: Number(row['Weight (KG)'] || 0),
-                    chargedWeight: Number(row['Charged Weight'] || 0),
+                    productPrice: row['Product Price'] ? Number(row['Product Price']) : 0,
+                    orderTotal: row['Order Total'] ? Number(row['Order Total']) : 0,
+                    discountValue: row['Discount Value'] ? Number(row['Discount Value']) : 0,
+                    weight: row['Weight (KG)'] ? Number(row['Weight (KG)']) : 0,
+                    chargedWeight: row['Charged Weight'] ? Number(row['Charged Weight']) : 0,
                     courierCompany: String(row['Courier Company'] || ''),
                     pickupLocationId: String(row['Pickup Location ID'] || ''),
-                    codPayableAmount: Number(row['COD Payble Amount'] || 0),
-                    remittedAmount: Number(row['Remitted Amount'] || 0),
-                    codCharges: Number(row['COD Charges'] || 0),
-                    shippingCharges: Number(row['Shipping Charges'] || 0),
-                    freightTotalAmount: Number(row['Freight Total Amount'] || 0),
+                    codPayableAmount: row['COD Payble Amount'] ? Number(row['COD Payble Amount']) : 0,
+                    remittedAmount: row['Remitted Amount'] ? Number(row['Remitted Amount']) : 0,
+                    codCharges: row['COD Charges'] ? Number(row['COD Charges']) : 0,
+                    shippingCharges: row['Shipping Charges'] ? Number(row['Shipping Charges']) : 0,
+                    freightTotalAmount: row['Freight Total Amount'] ? Number(row['Freight Total Amount']) : 0,
                     pickupPincode: String(row['Pickup Pincode'] || ''),
                     uploadDate: serverTimestamp(),
                     uploadId: metaDoc.id
-                  });
+                  };
                   
+                  // Convert shipDate to a proper timestamp if it exists
+                  if (row['Ship Date']) {
+                    try {
+                      const dateValue = new Date(row['Ship Date']);
+                      // Check if parsed date is valid
+                      if (!isNaN(dateValue.getTime())) {
+                        rowData.shipDate = Timestamp.fromDate(dateValue);
+                      } else {
+                        console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
+                        // Use current date as fallback
+                        rowData.shipDate = Timestamp.now();
+                      }
+                    } catch (e) {
+                      console.warn(`Error parsing date for row ${i}:`, e);
+                      // Use current date as fallback
+                      rowData.shipDate = Timestamp.now();
+                    }
+                  } else {
+                    // If no ship date, use current date
+                    rowData.shipDate = Timestamp.now();
+                  }
+                  
+                  // Clean the data (handle missing values)
+                  const cleanedData = cleanData(rowData);
+                  
+                  // Add to batch
+                  currentBatch.set(docRef, cleanedData);
                   recordCount++;
                   
                   // Update UI progress every few records for smoother experience
@@ -288,7 +354,7 @@ const ShippingCSVUpload = ({
                 if (recordCount % batchSize !== 0) {
                   try {
                     setProcessingStatus('Saving final records to database...');
-                    await batch.commit();
+                    await currentBatch.commit();
                     console.log('Committed final batch');
                   } catch (batchError) {
                     console.error('Error committing final batch:', batchError);
