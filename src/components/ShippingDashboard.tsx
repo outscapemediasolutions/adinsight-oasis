@@ -44,8 +44,7 @@ export interface ShippingOrder {
   freightTotalAmount: number;
 }
 
-// Define a type for the Firestore document data
-interface ShippingDocumentData extends DocumentData {
+interface ShippingDocumentData {
   orderId?: string;
   trackingId?: string;
   shipDate?: Timestamp | Date | string;

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Package, TrendingDown, CreditCard, Truck, Users } from "lucide-react";
+import { TrendingUp, Package, TrendingDown, CreditCard, Truck, Users, BarChart } from "lucide-react";
 import { ShippingMetrics } from "./utils/calculateMetrics";
 
 interface ShippingAnalyticsSummaryProps {

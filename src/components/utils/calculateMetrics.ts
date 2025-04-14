@@ -83,9 +83,9 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
     courierData[courier].total += 1;
     courierData[courier].totalCharges += order.freightTotalAmount;
     
-    if (order.status.toUpperCase().includes("DELIVER")) {
+    if (order.status && order.status.toUpperCase().includes("DELIVER")) {
       courierData[courier].delivered += 1;
-    } else if (order.status.toUpperCase().includes("RTO")) {
+    } else if (order.status && order.status.toUpperCase().includes("RTO")) {
       courierData[courier].rto += 1;
     }
   });
@@ -105,7 +105,7 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
   }, 0) / (orders.length || 1);
   
   // 7. COD Analysis
-  const codOrders = orders.filter(order => order.paymentMethod.toUpperCase().includes("COD"));
+  const codOrders = orders.filter(order => order.paymentMethod && order.paymentMethod.toUpperCase().includes("COD"));
   const totalCodAmount = codOrders.reduce((sum, order) => sum + order.codPayableAmount, 0);
   const totalRemitted = codOrders.reduce((sum, order) => sum + order.remittedAmount, 0);
   const codCollectionRate = totalCodAmount > 0 ? (totalRemitted / totalCodAmount) * 100 : 0;
@@ -116,7 +116,7 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
   // 8. Product Analysis
   const productData: Record<string, { quantity: number, revenue: number }> = {};
   orders.forEach(order => {
-    const product = order.productName;
+    const product = order.productName || "Unknown";
     if (!productData[product]) {
       productData[product] = { quantity: 0, revenue: 0 };
     }
@@ -133,6 +133,11 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
   // 9. Order Volume by Date
   const ordersByDate: Record<string, { date: string, orders: number, revenue: number }> = {};
   orders.forEach(order => {
+    // Ensure we have a valid date object
+    if (!(order.shipDate instanceof Date) || isNaN(order.shipDate.getTime())) {
+      return;
+    }
+    
     const dateStr = format(order.shipDate, 'yyyy-MM-dd');
     
     if (!ordersByDate[dateStr]) {

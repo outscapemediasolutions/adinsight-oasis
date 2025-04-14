@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { storage, db, auth } from "@/services/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
@@ -27,6 +27,7 @@ const ShippingCSVUpload = ({
   const [progress, setProgress] = useState(0);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [processingStatus, setProcessingStatus] = useState('');
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -35,13 +36,17 @@ const ShippingCSVUpload = ({
     setUploadSuccess(false);
     setUploadError('');
     setProgress(0);
+    setProcessingStatus('');
     
     if (selectedFile) {
       // Check if file is CSV
       if (!selectedFile.name.endsWith('.csv')) {
         setUploadError('Please upload a CSV file');
+        toast.error('Please upload a CSV file');
         return;
       }
+      
+      console.log("File selected:", selectedFile.name);
       
       // Parse CSV headers
       Papa.parse(selectedFile, {
@@ -62,11 +67,11 @@ const ShippingCSVUpload = ({
         error: function(error) {
           console.error("Error parsing CSV headers:", error);
           setUploadError('Failed to parse CSV headers. Please check file format.');
+          toast.error('Failed to parse CSV headers. Please check file format.');
         }
       });
       
       setFile(selectedFile);
-      console.log("File selected:", selectedFile.name);
     }
   }, [onHeadersDetected]);
 
@@ -81,6 +86,7 @@ const ShippingCSVUpload = ({
   const handleUpload = async () => {
     if (!file || !auth.currentUser) {
       console.log("No file selected or user not authenticated");
+      toast.error("No file selected or you're not logged in");
       return;
     }
     
@@ -88,6 +94,7 @@ const ShippingCSVUpload = ({
     setIsLoading(true);
     setUploadSuccess(false);
     setUploadError('');
+    setProcessingStatus('Preparing upload...');
     
     try {
       console.log("Starting upload process...");
@@ -98,14 +105,16 @@ const ShippingCSVUpload = ({
       uploadTask.on(
         'state_changed',
         (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 50); // Up to 50% for file upload
-          console.log(`Upload progress: ${progress}%`);
-          setProgress(progress);
+          const uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 50); // Up to 50% for file upload
+          console.log(`Upload progress: ${uploadProgress}%`);
+          setProgress(uploadProgress);
+          setProcessingStatus(`Uploading file: ${uploadProgress}%`);
         },
         (error) => {
           console.error('Upload failed:', error);
           setUploadError('Upload failed. Please try again.');
           setIsLoading(false);
+          setProcessingStatus('');
           onUploadComplete(false);
           toast.error('Upload failed. Please try again.');
         },
@@ -113,13 +122,27 @@ const ShippingCSVUpload = ({
           // Get download URL
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           console.log("File uploaded successfully, URL:", downloadURL);
+          setProcessingStatus('File uploaded. Processing data...');
           
           // Parse CSV data
           Papa.parse(file, {
             header: true,
+            skipEmptyLines: true,
             complete: async function(results) {
               try {
-                console.log(`Parsed ${results.data.length} rows from CSV`);
+                const parsedData = results.data;
+                console.log(`Parsed ${parsedData.length} rows from CSV`);
+                setProcessingStatus(`Processing ${parsedData.length} records...`);
+                setProgress(60);
+                
+                if (results.errors && results.errors.length > 0) {
+                  console.warn("CSV parsing had some errors:", results.errors);
+                }
+                
+                if (parsedData.length === 0) {
+                  throw new Error("No valid data found in the CSV file");
+                }
+                
                 // Create a batch for more efficient writes
                 const batch = writeBatch(db);
                 
@@ -131,7 +154,7 @@ const ShippingCSVUpload = ({
                   filename: file.name,
                   uploadDate: serverTimestamp(),
                   fileSize: file.size,
-                  recordCount: results.data.length,
+                  recordCount: parsedData.length,
                   downloadURL
                 });
                 
@@ -141,7 +164,7 @@ const ShippingCSVUpload = ({
                 const shippingCollection = collection(db, 'users', userId, 'shippingData');
                 
                 // Process only valid rows
-                const validRows = results.data.filter((row: any) => 
+                const validRows = parsedData.filter((row: any) => 
                   row && 
                   typeof row === 'object' && 
                   Object.keys(row).length > 0
@@ -155,13 +178,31 @@ const ShippingCSVUpload = ({
                 // Process first chunk directly in this batch
                 const firstChunk = validRows.slice(0, chunkSize);
                 
-                for (const row of firstChunk) {
+                for (let i = 0; i < firstChunk.length; i++) {
+                  const row = firstChunk[i];
                   if (typeof row === 'object' && row !== null) {
                     const docRef = doc(shippingCollection);
+                    
+                    // Convert shipDate properly
+                    let shipDate = null;
+                    if (row['Ship Date']) {
+                      try {
+                        shipDate = new Date(row['Ship Date']);
+                        // Check if date is valid
+                        if (isNaN(shipDate.getTime())) {
+                          console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
+                          shipDate = null;
+                        }
+                      } catch (e) {
+                        console.warn(`Error parsing date for row ${i}:`, e);
+                        shipDate = null;
+                      }
+                    }
+                    
                     batch.set(docRef, {
                       orderId: row['Order ID'] || '',
                       trackingId: row['Tracking ID'] || '',
-                      shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
+                      shipDate: shipDate,
                       channel: row['Channel'] || '',
                       status: row['Status'] || '',
                       channelSKU: row['Channel SKU'] || '',
@@ -194,29 +235,60 @@ const ShippingCSVUpload = ({
                       uploadDate: serverTimestamp(),
                       uploadId: metaDocRef.id
                     });
+                    
+                    if (i % 50 === 0) {
+                      const batchProgress = Math.min(70, 60 + Math.round((i / firstChunk.length) * 10));
+                      setProgress(batchProgress);
+                      setProcessingStatus(`Processing first batch: ${Math.round((i / firstChunk.length) * 100)}%`);
+                    }
                   }
                 }
                 
                 // Commit the first batch
-                await batch.commit();
-                console.log(`Successfully uploaded first batch of ${firstChunk.length} records`);
-                setProgress(60); // 60% progress after first batch
+                try {
+                  console.log("Committing first batch to Firestore...");
+                  setProcessingStatus("Saving data to database...");
+                  await batch.commit();
+                  console.log(`Successfully uploaded first batch of ${firstChunk.length} records`);
+                } catch (batchError) {
+                  console.error("Error committing first batch:", batchError);
+                  throw new Error(`Failed to save data: ${batchError.message}`);
+                }
+                
+                setProgress(75);
                 
                 // Process any remaining chunks
                 const remaining = validRows.slice(chunkSize);
                 let processedCount = firstChunk.length;
                 
                 for (let i = 0; i < remaining.length; i += chunkSize) {
+                  setProcessingStatus(`Processing additional batches: ${Math.round((processedCount / validRows.length) * 100)}%`);
                   const nextBatch = writeBatch(db);
                   const chunk = remaining.slice(i, i + chunkSize);
                   
-                  for (const row of chunk) {
+                  for (let j = 0; j < chunk.length; j++) {
+                    const row = chunk[j];
                     if (typeof row === 'object' && row !== null) {
                       const docRef = doc(shippingCollection);
+                      
+                      // Convert shipDate properly
+                      let shipDate = null;
+                      if (row['Ship Date']) {
+                        try {
+                          shipDate = new Date(row['Ship Date']);
+                          // Check if date is valid
+                          if (isNaN(shipDate.getTime())) {
+                            shipDate = null;
+                          }
+                        } catch (e) {
+                          shipDate = null;
+                        }
+                      }
+                      
                       nextBatch.set(docRef, {
                         orderId: row['Order ID'] || '',
                         trackingId: row['Tracking ID'] || '',
-                        shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
+                        shipDate: shipDate,
                         channel: row['Channel'] || '',
                         status: row['Status'] || '',
                         channelSKU: row['Channel SKU'] || '',
@@ -252,43 +324,58 @@ const ShippingCSVUpload = ({
                     }
                   }
                   
-                  await nextBatch.commit();
-                  processedCount += chunk.length;
-                  const updatedProgress = Math.min(95, 60 + Math.round((processedCount / validRows.length) * 35));
-                  setProgress(updatedProgress);
-                  console.log(`Successfully uploaded batch ${Math.floor(i/chunkSize) + 2} with ${chunk.length} records`);
+                  try {
+                    await nextBatch.commit();
+                    processedCount += chunk.length;
+                    const updatedProgress = Math.min(95, 75 + Math.round((processedCount / validRows.length) * 20));
+                    setProgress(updatedProgress);
+                    console.log(`Successfully uploaded batch ${Math.floor(i/chunkSize) + 2} with ${chunk.length} records`);
+                  } catch (batchError) {
+                    console.error(`Error committing batch ${Math.floor(i/chunkSize) + 2}:`, batchError);
+                    // Continue processing despite errors in additional batches
+                  }
                 }
                 
                 console.log("All data successfully uploaded to Firestore");
+                setProcessingStatus('Finalizing...');
                 setProgress(100);
                 setUploadSuccess(true);
                 setIsLoading(false);
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
+                
+                // Navigate to dashboard automatically after 1 second
+                setTimeout(() => {
+                  window.location.href = '/shipping-analytics';
+                }, 1000);
+                
               } catch (err) {
                 console.error('Error storing CSV data:', err);
-                setUploadError('Failed to process data. Please try again.');
+                setUploadError(`Failed to process data: ${err.message}`);
                 setIsLoading(false);
+                setProcessingStatus('');
                 onUploadComplete(false);
-                toast.error('Failed to process data. Please try again.');
+                toast.error(`Failed to process data: ${err.message}`);
               }
             },
             error: function(err) {
               console.error('Error parsing CSV:', err);
-              setUploadError('Failed to parse CSV. Please check file format.');
+              setUploadError(`Failed to parse CSV: ${err.message}`);
               setIsLoading(false);
+              setProcessingStatus('');
               onUploadComplete(false);
-              toast.error('Failed to parse CSV. Please check file format.');
+              toast.error(`Failed to parse CSV: ${err.message}`);
             }
           });
         }
       );
     } catch (error) {
       console.error('Error uploading file:', error);
-      setUploadError('Upload failed. Please try again.');
+      setUploadError(`Upload failed: ${error.message}`);
       setIsLoading(false);
+      setProcessingStatus('');
       onUploadComplete(false);
-      toast.error('Upload failed. Please try again.');
+      toast.error(`Upload failed: ${error.message}`);
     }
   };
 
@@ -332,9 +419,9 @@ const ShippingCSVUpload = ({
           </div>
 
           {isLoading && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span>Uploading...</span>
+                <span>{processingStatus || "Uploading..."}</span>
                 <span>{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
@@ -351,7 +438,12 @@ const ShippingCSVUpload = ({
               disabled={isLoading || !file || uploadSuccess}
               className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] hover:from-[#7E69AB] hover:to-[#9b87f5] text-white"
             >
-              {isLoading ? `Uploading (${progress}%)` : 'Upload File'}
+              {isLoading ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </span>
+              ) : 'Upload File'}
             </Button>
           </div>
         </div>
