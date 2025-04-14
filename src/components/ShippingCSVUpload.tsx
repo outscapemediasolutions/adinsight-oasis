@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { toast } from "sonner";
 import { Upload, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import { storage, db, auth } from "@/services/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, writeBatch, doc } from "firebase/firestore";
 import Papa from 'papaparse';
 
 interface ShippingCSVUploadProps {
@@ -107,8 +108,12 @@ const ShippingCSVUpload = ({
             header: true,
             complete: async function(results) {
               try {
+                // Create a batch for more efficient writes
+                const batch = writeBatch(db);
+                
                 // Add metadata to Firestore
-                await addDoc(collection(db, 'users', auth.currentUser!.uid, 'shippingData_meta'), {
+                const metaDocRef = doc(collection(db, 'users', auth.currentUser!.uid, 'shippingData_meta'));
+                batch.set(metaDocRef, {
                   filename: file.name,
                   uploadDate: serverTimestamp(),
                   fileSize: file.size,
@@ -116,44 +121,133 @@ const ShippingCSVUpload = ({
                   downloadURL
                 });
                 
-                // Add each row as a document in Firestore
-                const batch = results.data.slice(0, results.data.length - 1); // Remove last row if it's empty
+                // Process and add rows to Firestore
+                const shippingCollection = collection(db, 'users', auth.currentUser!.uid, 'shippingData');
                 
-                // Process data and add to Firestore
-                for (const row of batch) {
-                  // Fix: Ensure row is an object before spreading
-                  if (row && typeof row === 'object') {
-                    try {
-                      await addDoc(
-                        collection(db, 'users', auth.currentUser!.uid, 'shippingData'),
-                        {
-                          ...row,
-                          // Convert date strings to Date objects
-                          shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
-                          uploadDate: serverTimestamp(),
-                          // Parse numeric values
-                          productQuantity: parseInt(row['Product Quantity'] || '0'),
-                          orderTotal: parseFloat(row['Order Total'] || '0'),
-                          discountValue: parseFloat(row['Discount Value'] || '0'),
-                          weight: parseFloat(row['Weight (KG)'] || '0'),
-                          chargedWeight: parseFloat(row['Charged Weight'] || '0'),
-                          codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
-                          remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
-                          codCharges: parseFloat(row['COD Charges'] || '0'),
-                          shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
-                          freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0')
-                        }
-                      );
-                    } catch (e) {
-                      console.error('Error adding document:', e);
-                    }
+                // Process only valid rows
+                const validRows = results.data.filter((row: any) => 
+                  row && 
+                  typeof row === 'object' && 
+                  Object.keys(row).length > 0 &&
+                  row['Order ID'] // Ensure at least Order ID exists as a basic validity check
+                );
+                
+                // Process in chunks due to Firestore batch limits (max 500 operations)
+                const chunkSize = 400; // Keep under Firestore's 500 limit to be safe
+                
+                // Process first chunk directly in this batch
+                const firstChunk = validRows.slice(0, chunkSize);
+                
+                for (const row of firstChunk) {
+                  if (typeof row === 'object' && row !== null) {
+                    const docRef = doc(shippingCollection);
+                    batch.set(docRef, {
+                      // Safely parse and store the shipping data
+                      orderId: row['Order ID'] || '',
+                      trackingId: row['Tracking ID'] || '',
+                      shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
+                      channel: row['Channel'] || '',
+                      status: row['Status'] || '',
+                      channelSKU: row['Channel SKU'] || '',
+                      masterSKU: row['Master SKU'] || '',
+                      productName: row['Product Name'] || '',
+                      productCategory: row['Product Category'] || '',
+                      productQuantity: parseInt(row['Product Quantity'] || '0'),
+                      customerName: row['Customer Name'] || '',
+                      customerEmail: row['Customer Email'] || '',
+                      customerMobile: row['Customer Mobile'] || '',
+                      addressLine1: row['Address Line 1'] || '',
+                      addressLine2: row['Address Line 2'] || '',
+                      addressCity: row['Address City'] || '',
+                      addressState: row['Address State'] || '',
+                      addressPincode: row['Address Pincode'] || '',
+                      paymentMethod: row['Payment Method'] || '',
+                      productPrice: parseFloat(row['Product Price'] || '0'),
+                      orderTotal: parseFloat(row['Order Total'] || '0'),
+                      discountValue: parseFloat(row['Discount Value'] || '0'),
+                      weight: parseFloat(row['Weight (KG)'] || '0'),
+                      chargedWeight: parseFloat(row['Charged Weight'] || '0'),
+                      courierCompany: row['Courier Company'] || '',
+                      pickupLocationId: row['Pickup Location ID'] || '',
+                      codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
+                      remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
+                      codCharges: parseFloat(row['COD Charges'] || '0'),
+                      shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
+                      freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0'),
+                      pickupPincode: row['Pickup Pincode'] || '',
+                      uploadDate: serverTimestamp(),
+                      uploadId: metaDocRef.id
+                    });
                   }
                 }
                 
+                // Commit the first batch
+                await batch.commit();
+                console.log(`Successfully uploaded first batch of ${firstChunk.length} records`);
+                
+                // Process any remaining chunks
+                const remaining = validRows.slice(chunkSize);
+                let processedCount = firstChunk.length;
+                
+                for (let i = 0; i < remaining.length; i += chunkSize) {
+                  const nextBatch = writeBatch(db);
+                  const chunk = remaining.slice(i, i + chunkSize);
+                  
+                  for (const row of chunk) {
+                    if (typeof row === 'object' && row !== null) {
+                      const docRef = doc(shippingCollection);
+                      nextBatch.set(docRef, {
+                        orderId: row['Order ID'] || '',
+                        trackingId: row['Tracking ID'] || '',
+                        shipDate: row['Ship Date'] ? new Date(row['Ship Date']) : null,
+                        channel: row['Channel'] || '',
+                        status: row['Status'] || '',
+                        channelSKU: row['Channel SKU'] || '',
+                        masterSKU: row['Master SKU'] || '',
+                        productName: row['Product Name'] || '',
+                        productCategory: row['Product Category'] || '',
+                        productQuantity: parseInt(row['Product Quantity'] || '0'),
+                        customerName: row['Customer Name'] || '',
+                        customerEmail: row['Customer Email'] || '',
+                        customerMobile: row['Customer Mobile'] || '',
+                        addressLine1: row['Address Line 1'] || '',
+                        addressLine2: row['Address Line 2'] || '',
+                        addressCity: row['Address City'] || '',
+                        addressState: row['Address State'] || '',
+                        addressPincode: row['Address Pincode'] || '',
+                        paymentMethod: row['Payment Method'] || '',
+                        productPrice: parseFloat(row['Product Price'] || '0'),
+                        orderTotal: parseFloat(row['Order Total'] || '0'),
+                        discountValue: parseFloat(row['Discount Value'] || '0'),
+                        weight: parseFloat(row['Weight (KG)'] || '0'),
+                        chargedWeight: parseFloat(row['Charged Weight'] || '0'),
+                        courierCompany: row['Courier Company'] || '',
+                        pickupLocationId: row['Pickup Location ID'] || '',
+                        codPayableAmount: parseFloat(row['COD Payble Amount'] || '0'),
+                        remittedAmount: parseFloat(row['Remitted Amount'] || '0'),
+                        codCharges: parseFloat(row['COD Charges'] || '0'),
+                        shippingCharges: parseFloat(row['Shipping Charges'] || '0'),
+                        freightTotalAmount: parseFloat(row['Freight Total Amount'] || '0'),
+                        pickupPincode: row['Pickup Pincode'] || '',
+                        uploadDate: serverTimestamp(),
+                        uploadId: metaDocRef.id
+                      });
+                    }
+                  }
+                  
+                  await nextBatch.commit();
+                  processedCount += chunk.length;
+                  const updatedProgress = Math.min(95, Math.round((processedCount / validRows.length) * 95));
+                  setProgress(updatedProgress);
+                  console.log(`Successfully uploaded batch ${i/chunkSize + 2} with ${chunk.length} records`);
+                }
+                
+                setProgress(100);
                 setUploadSuccess(true);
                 setIsLoading(false);
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
+                console.log('Upload completed successfully');
               } catch (err) {
                 console.error('Error storing CSV data:', err);
                 setUploadError('Failed to process data. Please try again.');
