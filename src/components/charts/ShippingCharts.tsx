@@ -1,13 +1,13 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, TooltipProps } from 'recharts';
 import { useTheme } from 'next-themes';
+import { ShippingMetrics } from '../utils/calculateMetrics';
 
 interface ShippingChartsProps {
-  metrics: any;
+  metrics: ShippingMetrics | null;
   isLoading: boolean;
 }
 

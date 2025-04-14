@@ -6,12 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/services/firebase";
-import { collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit, Timestamp, DocumentData } from "firebase/firestore";
 import { format } from "date-fns";
 import { RefreshCw, Upload, RotateCcw, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ShippingAnalyticsSummary } from "./ShippingAnalyticsSummary";
 import { ShippingCharts } from "./charts/ShippingCharts";
+import { calculateMetrics, ShippingMetrics } from "./utils/calculateMetrics";
 
 interface ShippingDashboardProps {
   dateRange: { start?: Date; end?: Date };
@@ -43,12 +44,38 @@ export interface ShippingOrder {
   freightTotalAmount: number;
 }
 
+// Define a type for the Firestore document data
+interface ShippingDocumentData extends DocumentData {
+  orderId?: string;
+  trackingId?: string;
+  shipDate?: Timestamp | Date | string;
+  status?: string;
+  productName?: string;
+  productCategory?: string;
+  productQuantity?: string | number;
+  customerName?: string;
+  customerEmail?: string;
+  addressState?: string;
+  addressCity?: string;
+  paymentMethod?: string;
+  orderTotal?: string | number;
+  discountValue?: string | number;
+  weight?: string | number;
+  chargedWeight?: string | number;
+  courierCompany?: string;
+  codPayableAmount?: string | number;
+  remittedAmount?: string | number;
+  codCharges?: string | number;
+  shippingCharges?: string | number;
+  freightTotalAmount?: string | number;
+}
+
 const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<ShippingOrder[]>([]);
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<ShippingMetrics | null>(null);
   const [hasData, setHasData] = useState(false);
   
   useEffect(() => {
@@ -110,7 +137,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       const processedOrders: ShippingOrder[] = [];
       
       querySnapshot.forEach(doc => {
-        const data = doc.data();
+        const data = doc.data() as ShippingDocumentData;
         console.log("Processing document:", doc.id);
         
         // Convert date strings or Firestore timestamps to Date objects
@@ -130,7 +157,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           shipDate = new Date();
         }
         
-        // Create order object
+        // Create order object with proper type conversions
         const order: ShippingOrder = {
           id: doc.id,
           orderId: data.orderId || "",
@@ -139,22 +166,22 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           status: data.status || "",
           productName: data.productName || "",
           productCategory: data.productCategory || "",
-          productQuantity: parseInt(data.productQuantity || "0"),
+          productQuantity: typeof data.productQuantity === 'string' ? parseInt(data.productQuantity) : Number(data.productQuantity || 0),
           customerName: data.customerName || "",
           customerEmail: data.customerEmail || "",
           addressState: data.addressState || "",
           addressCity: data.addressCity || "",
           paymentMethod: data.paymentMethod || "",
-          orderTotal: parseFloat(data.orderTotal || "0"),
-          discountValue: parseFloat(data.discountValue || "0"),
-          weight: parseFloat(data.weight || "0"),
-          chargedWeight: parseFloat(data.chargedWeight || "0"),
+          orderTotal: typeof data.orderTotal === 'string' ? parseFloat(data.orderTotal) : Number(data.orderTotal || 0),
+          discountValue: typeof data.discountValue === 'string' ? parseFloat(data.discountValue) : Number(data.discountValue || 0),
+          weight: typeof data.weight === 'string' ? parseFloat(data.weight) : Number(data.weight || 0),
+          chargedWeight: typeof data.chargedWeight === 'string' ? parseFloat(data.chargedWeight) : Number(data.chargedWeight || 0),
           courierCompany: data.courierCompany || "",
-          codPayableAmount: parseFloat(data.codPayableAmount || "0"),
-          remittedAmount: parseFloat(data.remittedAmount || "0"),
-          codCharges: parseFloat(data.codCharges || "0"),
-          shippingCharges: parseFloat(data.shippingCharges || "0"),
-          freightTotalAmount: parseFloat(data.freightTotalAmount || "0")
+          codPayableAmount: typeof data.codPayableAmount === 'string' ? parseFloat(data.codPayableAmount) : Number(data.codPayableAmount || 0),
+          remittedAmount: typeof data.remittedAmount === 'string' ? parseFloat(data.remittedAmount) : Number(data.remittedAmount || 0),
+          codCharges: typeof data.codCharges === 'string' ? parseFloat(data.codCharges) : Number(data.codCharges || 0),
+          shippingCharges: typeof data.shippingCharges === 'string' ? parseFloat(data.shippingCharges) : Number(data.shippingCharges || 0),
+          freightTotalAmount: typeof data.freightTotalAmount === 'string' ? parseFloat(data.freightTotalAmount) : Number(data.freightTotalAmount || 0)
         };
         
         processedOrders.push(order);
@@ -163,8 +190,9 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       console.log(`Successfully processed ${processedOrders.length} orders`);
       setOrders(processedOrders);
       
-      // Calculate metrics
-      calculateMetrics(processedOrders);
+      // Calculate metrics using our utility function
+      const calculatedMetrics = calculateMetrics(processedOrders);
+      setMetrics(calculatedMetrics);
       
     } catch (error) {
       console.error("Error fetching shipping data:", error);
@@ -174,157 +202,6 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
     }
   };
   
-  const calculateMetrics = (orders: ShippingOrder[]) => {
-    console.log("Calculating metrics from", orders.length, "orders");
-    
-    // 1. Order Volume and Revenue
-    const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, order) => sum + order.orderTotal, 0);
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const totalDiscounts = orders.reduce((sum, order) => sum + order.discountValue, 0);
-    const discountPercentage = totalRevenue > 0 ? (totalDiscounts / totalRevenue) * 100 : 0;
-    
-    // 2. Order Status Distribution
-    const statusData: Record<string, number> = {};
-    orders.forEach(order => {
-      const status = order.status || "Unknown";
-      statusData[status] = (statusData[status] || 0) + 1;
-    });
-    
-    // 3. Payment Method Distribution
-    const paymentData: Record<string, number> = {};
-    orders.forEach(order => {
-      const method = order.paymentMethod || "Unknown";
-      paymentData[method] = (paymentData[method] || 0) + 1;
-    });
-    
-    // 4. Geographic Distribution
-    const stateData: Record<string, number> = {};
-    orders.forEach(order => {
-      const state = order.addressState || "Unknown";
-      stateData[state] = (stateData[state] || 0) + 1;
-    });
-    
-    // 5. Courier Performance
-    const courierData: Record<string, { total: number, delivered: number, rto: number, totalCharges: number }> = {};
-    orders.forEach(order => {
-      const courier = order.courierCompany || "Unknown";
-      if (!courierData[courier]) {
-        courierData[courier] = { total: 0, delivered: 0, rto: 0, totalCharges: 0 };
-      }
-      courierData[courier].total += 1;
-      courierData[courier].totalCharges += order.freightTotalAmount;
-      
-      if (order.status.toUpperCase().includes("DELIVER")) {
-        courierData[courier].delivered += 1;
-      } else if (order.status.toUpperCase().includes("RTO")) {
-        courierData[courier].rto += 1;
-      }
-    });
-    
-    // Calculate delivery rate and average cost
-    const courierPerformance = Object.entries(courierData).map(([name, data]) => ({
-      name,
-      deliveryRate: data.total > 0 ? (data.delivered / data.total) * 100 : 0,
-      rtoRate: data.total > 0 ? (data.rto / data.total) * 100 : 0,
-      avgCost: data.total > 0 ? data.totalCharges / data.total : 0,
-      total: data.total
-    }));
-    
-    // 6. Weight Analysis
-    const weightDiscrepancy = orders.reduce((sum, order) => {
-      return sum + (order.chargedWeight - order.weight);
-    }, 0) / (orders.length || 1);
-    
-    // 7. COD Analysis
-    const codOrders = orders.filter(order => order.paymentMethod.toUpperCase().includes("COD"));
-    const totalCodAmount = codOrders.reduce((sum, order) => sum + order.codPayableAmount, 0);
-    const totalRemitted = codOrders.reduce((sum, order) => sum + order.remittedAmount, 0);
-    const codCollectionRate = totalCodAmount > 0 ? (totalRemitted / totalCodAmount) * 100 : 0;
-    const avgCodCharges = codOrders.length > 0 
-      ? codOrders.reduce((sum, order) => sum + order.codCharges, 0) / codOrders.length
-      : 0;
-    
-    // 8. Product Analysis
-    const productData: Record<string, { quantity: number, revenue: number }> = {};
-    orders.forEach(order => {
-      const product = order.productName;
-      if (!productData[product]) {
-        productData[product] = { quantity: 0, revenue: 0 };
-      }
-      productData[product].quantity += order.productQuantity;
-      productData[product].revenue += order.orderTotal;
-    });
-    
-    // Get top products
-    const topProducts = Object.entries(productData)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-    
-    // 9. Order Volume by Date
-    const ordersByDate: Record<string, { date: string, orders: number, revenue: number }> = {};
-    orders.forEach(order => {
-      const dateStr = format(order.shipDate, 'yyyy-MM-dd');
-      
-      if (!ordersByDate[dateStr]) {
-        ordersByDate[dateStr] = {
-          date: dateStr,
-          orders: 0,
-          revenue: 0
-        };
-      }
-      
-      ordersByDate[dateStr].orders += 1;
-      ordersByDate[dateStr].revenue += order.orderTotal;
-    });
-    
-    const orderVolumeByDate = Object.values(ordersByDate)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    
-    // 10. Customer Analysis
-    const customerData: Record<string, number> = {};
-    orders.forEach(order => {
-      if (order.customerEmail) {
-        customerData[order.customerEmail] = (customerData[order.customerEmail] || 0) + 1;
-      }
-    });
-    
-    const uniqueCustomers = Object.keys(customerData).length;
-    const repeatCustomers = Object.values(customerData).filter(count => count > 1).length;
-    const repeatRate = uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0;
-    
-    // Set metrics
-    const calculatedMetrics = {
-      totalOrders,
-      totalRevenue,
-      avgOrderValue,
-      discountPercentage,
-      statusDistribution: Object.entries(statusData).map(([name, value]) => ({ name, value })),
-      paymentDistribution: Object.entries(paymentData).map(([name, value]) => ({ name, value })),
-      geographicDistribution: Object.entries(stateData).map(([name, value]) => ({ name, value })),
-      courierPerformance,
-      weightDiscrepancy,
-      codAnalysis: {
-        totalCodAmount,
-        totalRemitted,
-        codCollectionRate,
-        avgCodCharges,
-        codOrdersCount: codOrders.length
-      },
-      topProducts,
-      orderVolumeByDate,
-      customerAnalysis: {
-        uniqueCustomers,
-        repeatCustomers,
-        repeatRate
-      }
-    };
-    
-    console.log("Metrics calculated:", calculatedMetrics);
-    setMetrics(calculatedMetrics);
-  };
-
   const handleRefresh = () => {
     console.log("Manual refresh triggered");
     fetchShippingData();
