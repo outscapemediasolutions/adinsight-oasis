@@ -15,12 +15,14 @@ interface ShippingCSVUploadProps {
   onUploadStart: () => void;
   onUploadComplete: (success: boolean, filename?: string) => void;
   onHeadersDetected?: (headers: string[]) => void;
+  columnMapping?: Record<string, string>;
 }
 
 const ShippingCSVUpload = ({ 
   onUploadStart, 
   onUploadComplete,
-  onHeadersDetected 
+  onHeadersDetected,
+  columnMapping = {}
 }: ShippingCSVUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,57 +32,42 @@ const ShippingCSVUpload = ({
   const [processingStatus, setProcessingStatus] = useState('');
 
   // Helper function to clean data and handle missing values
-  const cleanData = (data: any) => {
+  const cleanData = (data: any, mapping: Record<string, string>) => {
     if (!data) return null;
     
-    // Clone the object to avoid modifying the original
-    const cleaned: any = { ...data };
+    // Create a new object for the cleaned data
+    const cleaned: any = {};
     
-    // Required fields validation
-    const requiredFields = ["orderId", "shipDate", "productQuantity"];
-    const missingRequired = requiredFields.filter(field => 
-      !cleaned[field] || cleaned[field] === "" || cleaned[field] === "N/A"
-    );
-    
-    if (missingRequired.length > 0) {
-      console.warn("Missing required fields:", missingRequired);
-    }
-    
-    // Clean numerical fields (replace empty, N/A, undefined with 0)
-    const numericalFields = [
-      "productQuantity", "productPrice", "orderTotal", "discountValue", 
-      "weight", "chargedWeight", "codPayableAmount", "remittedAmount", 
-      "codCharges", "shippingCharges", "freightTotalAmount"
-    ];
-    
-    numericalFields.forEach(field => {
-      const value = cleaned[field];
-      if (value === "" || value === "N/A" || value === undefined || value === null) {
-        cleaned[field] = 0;
-        console.warn(`Replaced missing value with 0 for ${field}`);
-      } else if (typeof value === 'string') {
+    // Map CSV columns to expected field names
+    Object.entries(mapping).forEach(([fieldKey, csvHeader]) => {
+      if (!csvHeader) return; // Skip unmapped fields
+      
+      // Get the value from the CSV data
+      let value = data[csvHeader];
+      
+      // Check if the value is missing or empty
+      const isEmpty = value === undefined || value === null || value === "" || value === "N/A";
+      
+      // Handle numerical fields (replace empty with 0)
+      const numericalFields = [
+        "productQuantity", "productPrice", "orderTotal", "discountValue", 
+        "weight", "chargedWeight", "codPayableAmount", "remittedAmount", 
+        "codCharges", "shippingCharges", "freightTotalAmount"
+      ];
+      
+      if (isEmpty) {
+        if (numericalFields.includes(fieldKey)) {
+          value = 0;
+        } else {
+          value = ""; // Empty string for string fields
+        }
+      } else if (numericalFields.includes(fieldKey) && typeof value === 'string') {
         // Convert string numbers to actual numbers
-        cleaned[field] = parseFloat(value) || 0;
+        value = parseFloat(value) || 0;
       }
-    });
-    
-    // Clean string fields (replace empty, N/A, undefined with empty string)
-    const stringFields = [
-      "trackingId", "channel", "status", "channelSKU", "masterSKU",
-      "productName", "productCategory", "customerName", "customerEmail",
-      "customerMobile", "addressLine1", "addressLine2", "addressCity",
-      "addressState", "addressPincode", "paymentMethod", "courierCompany",
-      "pickupLocationId", "pickupPincode"
-    ];
-    
-    stringFields.forEach(field => {
-      const value = cleaned[field];
-      if (value === "" || value === "N/A" || value === undefined || value === null) {
-        cleaned[field] = "";
-        console.warn(`Replaced missing value with empty string for ${field}`);
-      } else {
-        cleaned[field] = String(value);
-      }
+      
+      // Add to cleaned data
+      cleaned[fieldKey] = value;
     });
     
     return cleaned;
@@ -117,21 +104,6 @@ const ShippingCSVUpload = ({
               const headers = Object.keys(firstRow);
               console.log("Detected headers:", headers);
               
-              // Validate required headers
-              const requiredHeaders = [
-                "Order ID", "Ship Date", "Status", "Product Name", 
-                "Product Quantity", "Order Total"
-              ];
-              
-              const missingHeaders = requiredHeaders.filter(
-                header => !headers.some(h => h.toLowerCase() === header.toLowerCase())
-              );
-              
-              if (missingHeaders.length > 0) {
-                console.warn("Missing required headers:", missingHeaders);
-                toast.warning(`Missing required headers: ${missingHeaders.join(", ")}`);
-              }
-              
               if (onHeadersDetected) {
                 onHeadersDetected(headers);
               }
@@ -161,6 +133,18 @@ const ShippingCSVUpload = ({
     if (!file || !auth.currentUser) {
       console.log("No file selected or user not authenticated");
       toast.error("No file selected or you're not logged in");
+      return;
+    }
+    
+    // Check if column mapping is empty
+    if (Object.keys(columnMapping).length === 0) {
+      toast.error("Please set up column mapping before uploading");
+      return;
+    }
+    
+    // Verify tracking ID is mapped (primary field)
+    if (!columnMapping.trackingId) {
+      toast.error("Tracking ID must be mapped as it's the primary field");
       return;
     }
     
@@ -231,7 +215,8 @@ const ShippingCSVUpload = ({
                   uploadDate: serverTimestamp(),
                   fileSize: file.size,
                   recordCount: parsedData.length,
-                  downloadURL
+                  downloadURL,
+                  columnMapping: columnMapping // Store the column mapping with metadata
                 });
                 
                 console.log("Created metadata document with ID:", metaDoc.id);
@@ -243,6 +228,7 @@ const ShippingCSVUpload = ({
                 let currentBatch = writeBatch(db);
                 let batchCount = 0;
                 let recordCount = 0;
+                let recordsWithTrackingId = 0;
                 
                 const shippingCollection = collection(db, 'users', userId, 'shippingData');
                 
@@ -273,70 +259,48 @@ const ShippingCSVUpload = ({
                     continue;
                   }
                   
-                  // Create a document reference with a unique ID
-                  const docRef = doc(shippingCollection);
+                  // Clean and map the data
+                  const cleanedData = cleanData(row, columnMapping);
                   
-                  // Map CSV column names to our database field names and clean up data
-                  const rowData: any = {
-                    orderId: String(row['Order ID'] || ''),
-                    trackingId: String(row['Tracking ID'] || ''),
-                    channel: String(row['Channel'] || ''),
-                    status: String(row['Status'] || ''),
-                    channelSKU: String(row['Channel SKU'] || ''),
-                    masterSKU: String(row['Master SKU'] || ''),
-                    productName: String(row['Product Name'] || ''),
-                    productCategory: String(row['Product Category'] || ''),
-                    productQuantity: row['Product Quantity'] ? Number(row['Product Quantity']) : 0,
-                    customerName: String(row['Customer Name'] || ''),
-                    customerEmail: String(row['Customer Email'] || ''),
-                    customerMobile: String(row['Customer Mobile'] || ''),
-                    addressLine1: String(row['Address Line 1'] || ''),
-                    addressLine2: String(row['Address Line 2'] || ''),
-                    addressCity: String(row['Address City'] || ''),
-                    addressState: String(row['Address State'] || ''),
-                    addressPincode: String(row['Address Pincode'] || ''),
-                    paymentMethod: String(row['Payment Method'] || ''),
-                    productPrice: row['Product Price'] ? Number(row['Product Price']) : 0,
-                    orderTotal: row['Order Total'] ? Number(row['Order Total']) : 0,
-                    discountValue: row['Discount Value'] ? Number(row['Discount Value']) : 0,
-                    weight: row['Weight (KG)'] ? Number(row['Weight (KG)']) : 0,
-                    chargedWeight: row['Charged Weight'] ? Number(row['Charged Weight']) : 0,
-                    courierCompany: String(row['Courier Company'] || ''),
-                    pickupLocationId: String(row['Pickup Location ID'] || ''),
-                    codPayableAmount: row['COD Payble Amount'] ? Number(row['COD Payble Amount']) : 0,
-                    remittedAmount: row['Remitted Amount'] ? Number(row['Remitted Amount']) : 0,
-                    codCharges: row['COD Charges'] ? Number(row['COD Charges']) : 0,
-                    shippingCharges: row['Shipping Charges'] ? Number(row['Shipping Charges']) : 0,
-                    freightTotalAmount: row['Freight Total Amount'] ? Number(row['Freight Total Amount']) : 0,
-                    pickupPincode: String(row['Pickup Pincode'] || ''),
-                    uploadDate: serverTimestamp(),
-                    uploadId: metaDoc.id
-                  };
+                  // Add uploadId and timestamps
+                  cleanedData.uploadId = metaDoc.id;
+                  cleanedData.uploadDate = serverTimestamp();
+                  cleanedData.processedAt = serverTimestamp();
                   
-                  // Convert shipDate to a proper timestamp if it exists
-                  if (row['Ship Date']) {
+                  // Convert shipDate to a Timestamp if it exists
+                  if (cleanedData.shipDate) {
                     try {
-                      const dateValue = new Date(row['Ship Date']);
+                      const dateValue = new Date(cleanedData.shipDate);
                       // Check if parsed date is valid
                       if (!isNaN(dateValue.getTime())) {
-                        rowData.shipDate = Timestamp.fromDate(dateValue);
+                        cleanedData.shipDate = Timestamp.fromDate(dateValue);
                       } else {
-                        console.warn(`Invalid date format for row ${i}:`, row['Ship Date']);
+                        console.warn(`Invalid date format for row ${i}:`, cleanedData.shipDate);
                         // Use current date as fallback
-                        rowData.shipDate = Timestamp.now();
+                        cleanedData.shipDate = Timestamp.now();
                       }
                     } catch (e) {
                       console.warn(`Error parsing date for row ${i}:`, e);
                       // Use current date as fallback
-                      rowData.shipDate = Timestamp.now();
+                      cleanedData.shipDate = Timestamp.now();
                     }
                   } else {
                     // If no ship date, use current date
-                    rowData.shipDate = Timestamp.now();
+                    cleanedData.shipDate = Timestamp.now();
                   }
                   
-                  // Clean the data (handle missing values)
-                  const cleanedData = cleanData(rowData);
+                  // Flag to indicate if this record has a valid tracking ID
+                  const hasTrackingId = cleanedData.trackingId && cleanedData.trackingId.trim() !== '';
+                  
+                  // Add a marker to indicate if this record has a tracking ID (for filtering in dashboard)
+                  cleanedData.hasTrackingId = hasTrackingId;
+                  
+                  if (hasTrackingId) {
+                    recordsWithTrackingId++;
+                  }
+                  
+                  // Create a document reference with a unique ID based on orderId + index
+                  const docRef = doc(shippingCollection);
                   
                   // Add to batch
                   currentBatch.set(docRef, cleanedData);
@@ -362,18 +326,33 @@ const ShippingCSVUpload = ({
                   }
                 }
                 
+                // Update metadata with valid tracking ID count
+                await addDoc(collection(db, 'users', userId, 'shippingData_stats'), {
+                  uploadId: metaDoc.id,
+                  totalRecords: recordCount,
+                  recordsWithTrackingId: recordsWithTrackingId,
+                  uploadDate: serverTimestamp()
+                });
+                
                 // Finalize the upload
                 setProgress(100);
                 setProcessingStatus('Upload complete!');
                 setUploadSuccess(true);
                 setIsLoading(false);
                 console.log(`Successfully uploaded ${recordCount} records to Firestore`);
+                
+                // Display warning if not all records have tracking IDs
+                if (recordsWithTrackingId < recordCount) {
+                  toast.warning(`${recordCount - recordsWithTrackingId} records without Tracking ID will not appear in dashboard.`);
+                }
+                
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
                 
                 // Navigate to the dashboard automatically after a short delay
                 setTimeout(() => {
-                  window.location.href = '/shipping-analytics';
+                  setFile(null);
+                  setProgress(0);
                 }, 1500);
                 
               } catch (err: any) {
@@ -427,6 +406,22 @@ const ShippingCSVUpload = ({
         </div>
       </Card>
 
+      {Object.keys(columnMapping).length > 0 && (
+        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-muted">
+          <p className="font-medium mb-1">Column mapping applied:</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {Object.entries(columnMapping).map(([key, value]) => (
+              value && (
+                <div key={key} className="flex justify-between">
+                  <span>{key}:</span>
+                  <span className="text-primary-foreground">{value}</span>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
       {file && (
         <div className="space-y-2">
           <div className="flex items-start gap-2 rounded-md border p-3">
@@ -462,7 +457,7 @@ const ShippingCSVUpload = ({
           <div className="flex justify-end">
             <Button 
               onClick={handleUpload} 
-              disabled={isLoading || !file || uploadSuccess}
+              disabled={isLoading || !file || uploadSuccess || Object.keys(columnMapping).length === 0}
               className="bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] hover:from-[#7E69AB] hover:to-[#9b87f5] text-white"
             >
               {isLoading ? (
@@ -470,7 +465,10 @@ const ShippingCSVUpload = ({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Processing...
                 </span>
-              ) : 'Upload File'}
+              ) : Object.keys(columnMapping).length === 0 ? 
+                'Set Column Mapping First' : 
+                'Upload File'
+              }
             </Button>
           </div>
         </div>

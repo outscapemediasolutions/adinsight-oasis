@@ -24,6 +24,7 @@ const ShippingAnalytics = () => {
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState(0);
   const [dateRange, setDateRange] = useState<{ start?: Date, end?: Date }>({});
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   
   useEffect(() => {
     // Check for tab to show from navigation state
@@ -74,26 +75,15 @@ const ShippingAnalytics = () => {
     console.log("Upload start handler triggered");
     setUploadSuccess(false);
     setUploadFilename(null);
+    setColumnMapping({});
   };
   
   const handleHeadersDetected = (headers: string[]) => {
     console.log("CSV Headers detected:", headers);
     setCsvHeaders(headers);
     
-    // Check if all required headers are present
-    const requiredHeaders = [
-      "Order ID", "Ship Date", "Status", "Product Name", 
-      "Product Quantity", "Order Total"
-    ];
-    
-    const missingHeaders = requiredHeaders.filter(
-      header => !headers.some(h => h.toLowerCase() === header.toLowerCase())
-    );
-    
-    if (missingHeaders.length > 0) {
-      console.log("Missing required headers:", missingHeaders);
-      setShowColumnMappingDialog(true);
-    }
+    // Always show the column mapping dialog for better user experience
+    setShowColumnMappingDialog(true);
   };
   
   const handleUploadComplete = (success: boolean, filename?: string) => {
@@ -110,6 +100,12 @@ const ShippingAnalytics = () => {
   const handleUploadSuccess = () => {
     console.log("Upload successful, refreshing history...");
     setRefreshHistoryTrigger(prev => prev + 1);
+  };
+  
+  const handleColumnMappingConfirm = (mapping: Record<string, string>) => {
+    console.log("Column mapping confirmed:", mapping);
+    setColumnMapping(mapping);
+    toast.success("Column mapping applied. Please proceed with the upload.");
   };
   
   const handleDateRangeChange = (startDate: Date | undefined, endDate: Date | undefined) => {
@@ -152,7 +148,21 @@ const ShippingAnalytics = () => {
                 onUploadStart={handleUploadStart}
                 onUploadComplete={handleUploadComplete}
                 onHeadersDetected={handleHeadersDetected}
+                columnMapping={columnMapping}
               />
+              
+              {csvHeaders.length > 0 && (
+                <div className="mt-2 text-sm flex justify-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowColumnMappingDialog(true)}
+                    className="text-xs"
+                  >
+                    Modify Column Mapping
+                  </Button>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex justify-between items-center">
               <Button variant="link" onClick={() => setShowTemplateDialog(true)}>
@@ -193,7 +203,7 @@ const ShippingAnalytics = () => {
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Tracking ID</TableCell>
-                        <TableCell>Tracking number for the shipment</TableCell>
+                        <TableCell>Tracking number for the shipment (Primary field)</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Ship Date</TableCell>
@@ -240,6 +250,11 @@ const ShippingAnalytics = () => {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   You can download a sample template above to ensure your data is formatted correctly.
+                  <br />
+                  <span className="text-yellow-500">
+                    Note: Empty cells will be treated as empty strings for text fields and zeros for numeric fields.
+                    Only records with a valid Tracking ID will be shown in the dashboard.
+                  </span>
                 </p>
               </div>
               <DialogFooter>
@@ -253,7 +268,8 @@ const ShippingAnalytics = () => {
           <ColumnMappingDialog 
             open={showColumnMappingDialog} 
             onOpenChange={setShowColumnMappingDialog} 
-            csvHeaders={csvHeaders} 
+            csvHeaders={csvHeaders}
+            onConfirm={handleColumnMappingConfirm}
           />
         </TabsContent>
         

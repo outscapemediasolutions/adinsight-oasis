@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface ColumnMappingDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
   
   const requiredFields = [
     { key: "orderId", label: "Order ID" },
+    { key: "trackingId", label: "Tracking ID" },
     { key: "shipDate", label: "Ship Date" },
     { key: "status", label: "Status" },
     { key: "productName", label: "Product Name" },
@@ -25,7 +27,6 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
   ];
   
   const optionalFields = [
-    { key: "trackingId", label: "Tracking ID" },
     { key: "productCategory", label: "Product Category" },
     { key: "customerName", label: "Customer Name" },
     { key: "customerEmail", label: "Customer Email" },
@@ -78,8 +79,23 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
   }, [csvHeaders]);
   
   const handleConfirm = () => {
+    // Check if all required fields are mapped
+    const unmappedRequired = requiredFields.filter(field => !mapping[field.key]);
+    
+    if (unmappedRequired.length > 0) {
+      toast.warning(`Please map these required fields: ${unmappedRequired.map(f => f.label).join(', ')}`);
+      return;
+    }
+    
+    // Ensure tracking ID is mapped as it's primary
+    if (!mapping['trackingId']) {
+      toast.warning('Tracking ID is required as it\'s the primary identifier');
+      return;
+    }
+    
     if (onConfirm) {
       onConfirm(mapping);
+      toast.success('Column mapping applied successfully');
     }
     onOpenChange(false);
   };
@@ -91,6 +107,9 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
           <DialogTitle>Column Mapping</DialogTitle>
           <DialogDescription>
             Map your CSV columns to the required fields. This ensures your data is processed correctly.
+            <div className="mt-2 text-xs text-yellow-500 font-medium">
+              Note: Tracking ID is the primary field and only records with Tracking ID will be shown in dashboard.
+            </div>
           </DialogDescription>
         </DialogHeader>
         

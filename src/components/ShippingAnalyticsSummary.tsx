@@ -34,6 +34,26 @@ export const ShippingAnalyticsSummary = ({ metrics, isLoading }: ShippingAnalyti
     }).format(value / 100);
   };
   
+  // Safely calculate delivery success rate
+  const calculateDeliverySuccessRate = () => {
+    if (!metrics || !metrics.courierPerformance || metrics.courierPerformance.length === 0) {
+      return 0;
+    }
+    
+    const totalDeliveries = metrics.courierPerformance.reduce(
+      (sum: number, courier: any) => sum + (courier.total || 0), 0
+    );
+    
+    if (totalDeliveries === 0) return 0;
+    
+    const weightedSuccessRate = metrics.courierPerformance.reduce(
+      (sum: number, courier: any) => 
+        sum + ((courier.deliveryRate || 0) * (courier.total || 0)), 0
+    );
+    
+    return weightedSuccessRate / totalDeliveries;
+  };
+  
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card className="border border-muted/20 bg-card/90 backdrop-blur-sm">
@@ -110,12 +130,7 @@ export const ShippingAnalyticsSummary = ({ metrics, isLoading }: ShippingAnalyti
             <Skeleton className="h-7 w-16" />
           ) : (
             <div className="text-2xl font-bold">
-              {metrics && metrics.courierPerformance && metrics.courierPerformance.length > 0
-                ? formatPercent(metrics.courierPerformance.reduce((sum: number, courier: any) => 
-                    sum + ((courier.deliveryRate || 0) * (courier.total || 0)), 0) / 
-                    metrics.courierPerformance.reduce((sum: number, courier: any) => sum + (courier.total || 0), 0))
-                : '0%'
-              }
+              {formatPercent(calculateDeliverySuccessRate())}
             </div>
           )}
         </CardContent>
