@@ -40,7 +40,7 @@ const ShippingCSVUpload = ({
     
     // Map CSV columns to expected field names
     Object.entries(mapping).forEach(([fieldKey, csvHeader]) => {
-      if (!csvHeader) return; // Skip unmapped fields
+      if (!csvHeader || csvHeader === "not-mapped") return; // Skip unmapped fields
       
       // Get the value from the CSV data
       let value = data[csvHeader];
@@ -411,7 +411,7 @@ const ShippingCSVUpload = ({
           <p className="font-medium mb-1">Column mapping applied:</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {Object.entries(columnMapping).map(([key, value]) => (
-              value && (
+              value && value !== "not-mapped" && (
                 <div key={key} className="flex justify-between">
                   <span>{key}:</span>
                   <span className="text-primary-foreground">{value}</span>
