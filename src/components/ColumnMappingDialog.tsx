@@ -155,7 +155,7 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Not mapped</SelectItem>
+                    <SelectItem key="not-mapped" value="not-mapped">Not mapped</SelectItem>
                     {csvHeaders.map((header) => (
                       <SelectItem key={header} value={header}>
                         {header}
