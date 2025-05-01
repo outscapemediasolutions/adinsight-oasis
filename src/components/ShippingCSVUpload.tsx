@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
+
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -30,6 +31,15 @@ const ShippingCSVUpload = ({
   const [uploadError, setUploadError] = useState('');
   const [processingStatus, setProcessingStatus] = useState('');
   const uploadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (uploadTimeoutRef.current) {
+        clearTimeout(uploadTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Helper function to clean data and handle missing values
   const cleanData = (data: any, mapping: Record<string, string>) => {
@@ -75,6 +85,8 @@ const ShippingCSVUpload = ({
     
     // Add a marker to indicate if this record has a valid tracking ID
     cleaned.hasTrackingId = cleaned.trackingId && cleaned.trackingId.trim() !== '';
+    
+    console.log("Cleaned data:", cleaned); // Debug log
     
     return cleaned;
   };
@@ -142,7 +154,7 @@ const ShippingCSVUpload = ({
       return;
     }
     
-    // Check if column mapping is empty
+    // Check if column mapping is empty or necessary fields are missing
     if (Object.keys(columnMapping).length === 0) {
       toast.error("Please set up column mapping before uploading");
       return;
@@ -154,6 +166,14 @@ const ShippingCSVUpload = ({
       return;
     }
     
+    // Verify required fields are mapped
+    const requiredFields = ["orderId", "shipDate", "productQuantity"];
+    const missingFields = requiredFields.filter(field => !columnMapping[field]);
+    if (missingFields.length > 0) {
+      toast.error(`Missing required field mappings: ${missingFields.join(", ")}`);
+      return;
+    }
+    
     onUploadStart();
     setIsLoading(true);
     setUploadSuccess(false);
@@ -162,6 +182,10 @@ const ShippingCSVUpload = ({
     setProgress(5); // Start with 5% to show activity
     
     // Set a timeout to abort if the upload takes too long
+    if (uploadTimeoutRef.current) {
+      clearTimeout(uploadTimeoutRef.current);
+    }
+    
     uploadTimeoutRef.current = setTimeout(() => {
       setUploadError('Upload timed out after 30 seconds. Please try again.');
       setIsLoading(false);
@@ -172,7 +196,7 @@ const ShippingCSVUpload = ({
     }, 30000);
     
     try {
-      console.log("Starting upload process...");
+      console.log("Starting upload process with column mapping:", columnMapping);
       
       // First, store the file in Firebase Storage as backup
       const storageRef = ref(storage, `shipping_data/${Date.now()}-${file.name}`);
@@ -187,8 +211,8 @@ const ShippingCSVUpload = ({
           setProcessingStatus(`Uploading file: ${uploadProgress}%`);
         },
         (error) => {
-          console.error('Upload failed:', error);
-          setUploadError('File upload failed. Please try again.');
+          console.error('Upload to storage failed:', error);
+          setUploadError(`File upload failed: ${error.message}`);
           setIsLoading(false);
           setProcessingStatus('');
           setProgress(0);
@@ -199,223 +223,261 @@ const ShippingCSVUpload = ({
           }
           
           onUploadComplete(false);
-          toast.error('File upload failed. Please try again.');
+          toast.error(`File upload failed: ${error.message}`);
         },
         async () => {
           // Get download URL after upload completes
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log("File uploaded successfully, URL:", downloadURL);
-          setProcessingStatus('File uploaded. Starting CSV processing...');
-          setProgress(25);
-          
-          // Parse CSV data with enhanced error handling
-          Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            dynamicTyping: false, // Keep as strings until we process them
-            complete: async function(results) {
-              try {
-                const parsedData = results.data;
-                console.log(`Parsed ${parsedData.length} rows from CSV`);
-                setProcessingStatus(`Parsed ${parsedData.length} records. Processing data...`);
-                setProgress(40);
-                
-                // Report any parsing errors
-                if (results.errors && results.errors.length > 0) {
-                  console.warn("CSV parsing had some errors:", results.errors);
-                  toast.warning(`CSV parsing had ${results.errors.length} errors. Some data may be incomplete.`);
-                }
-                
-                if (parsedData.length === 0) {
-                  throw new Error("No valid data found in the CSV file");
-                }
-                
-                // Create a metadata document first
-                const metaRef = collection(db, 'shippingData_meta');
-                
-                const metaDoc = await addDoc(metaRef, {
-                  filename: file.name,
-                  uploadDate: serverTimestamp(),
-                  fileSize: file.size,
-                  recordCount: parsedData.length,
-                  downloadURL,
-                  columnMapping: columnMapping // Store the column mapping with metadata
-                });
-                
-                console.log("Created metadata document with ID:", metaDoc.id);
-                setProgress(50);
-                setProcessingStatus('Preparing data for database...');
-                
-                // Process data in batches to avoid Firestore limits
-                const batchSize = 400; // Keep under Firestore's limit
-                let currentBatch = writeBatch(db);
-                let batchCount = 0;
-                let recordCount = 0;
-                let recordsWithTrackingId = 0;
-                
-                const shippingCollection = collection(db, 'shippingData');
-                
-                for (let i = 0; i < parsedData.length; i++) {
-                  // Commit the current batch and create a new one if we've reached the limit
-                  if (i > 0 && i % batchSize === 0) {
-                    try {
-                      setProcessingStatus(`Saving batch ${++batchCount} to database...`);
-                      await currentBatch.commit();
-                      console.log(`Committed batch ${batchCount}`);
-                      
-                      // Calculate overall progress (50% for initial steps + up to 45% for batches)
-                      const batchProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
-                      setProgress(batchProgress);
-                      
-                      // Create a new batch for the next set of records
-                      currentBatch = writeBatch(db);
-                    } catch (batchError) {
-                      console.error(`Error committing batch ${batchCount}:`, batchError);
-                      toast.error(`Error saving batch ${batchCount}. Some data may be missing.`);
-                      // Continue with next batch despite errors
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            console.log("File uploaded successfully to storage, URL:", downloadURL);
+            setProcessingStatus('File uploaded to storage. Starting CSV processing...');
+            setProgress(25);
+            
+            // Parse CSV data with enhanced error handling
+            Papa.parse(file, {
+              header: true,
+              skipEmptyLines: true,
+              dynamicTyping: false, // Keep as strings until we process them
+              complete: async function(results) {
+                try {
+                  const parsedData = results.data;
+                  console.log(`Parsed ${parsedData.length} rows from CSV`);
+                  setProcessingStatus(`Parsed ${parsedData.length} records. Processing data...`);
+                  setProgress(40);
+                  
+                  // Report any parsing errors
+                  if (results.errors && results.errors.length > 0) {
+                    console.warn("CSV parsing had some errors:", results.errors);
+                    toast.warning(`CSV parsing had ${results.errors.length} errors. Some data may be incomplete.`);
+                  }
+                  
+                  if (parsedData.length === 0) {
+                    throw new Error("No valid data found in the CSV file");
+                  }
+                  
+                  // Create a metadata document first
+                  const metaRef = collection(db, 'shippingData_meta');
+                  
+                  const metaDoc = await addDoc(metaRef, {
+                    filename: file.name,
+                    uploadDate: serverTimestamp(),
+                    fileSize: file.size,
+                    recordCount: parsedData.length,
+                    downloadURL,
+                    columnMapping: columnMapping // Store the column mapping with metadata
+                  });
+                  
+                  console.log("Created metadata document with ID:", metaDoc.id);
+                  setProgress(50);
+                  setProcessingStatus('Preparing data for database...');
+                  
+                  // Process data in batches to avoid Firestore limits
+                  const batchSize = 200; // Keep well under Firestore's limit
+                  let currentBatch = writeBatch(db);
+                  let batchCount = 0;
+                  let recordCount = 0;
+                  let recordsWithTrackingId = 0;
+                  let errorCount = 0;
+                  
+                  const shippingCollection = collection(db, 'shippingData');
+                  
+                  for (let i = 0; i < parsedData.length; i++) {
+                    // Commit the current batch and create a new one if we've reached the limit
+                    if (i > 0 && i % batchSize === 0) {
+                      try {
+                        setProcessingStatus(`Saving batch ${++batchCount} to database...`);
+                        await currentBatch.commit();
+                        console.log(`Committed batch ${batchCount} successfully`);
+                        
+                        // Calculate overall progress (50% for initial steps + up to 45% for batches)
+                        const batchProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
+                        setProgress(batchProgress);
+                        
+                        // Create a new batch for the next set of records
+                        currentBatch = writeBatch(db);
+                      } catch (batchError: any) {
+                        console.error(`Error committing batch ${batchCount}:`, batchError);
+                        errorCount++;
+                        toast.error(`Error saving batch ${batchCount}: ${batchError.message}`);
+                        // Create a new batch and continue despite errors
+                        currentBatch = writeBatch(db);
+                      }
                     }
-                  }
-                  
-                  const row = parsedData[i];
-                  if (typeof row !== 'object' || row === null) {
-                    console.warn(`Skipping invalid row at index ${i}`);
-                    continue;
-                  }
-                  
-                  // Clean and map the data
-                  const cleanedData = cleanData(row, columnMapping);
-                  
-                  if (!cleanedData) {
-                    console.warn(`Row ${i} resulted in null data after cleaning, skipping`);
-                    continue;
-                  }
-                  
-                  // Add uploadId and timestamps
-                  cleanedData.uploadId = metaDoc.id;
-                  cleanedData.uploadDate = serverTimestamp();
-                  cleanedData.processedAt = serverTimestamp();
-                  
-                  // Convert shipDate to a Timestamp if it exists
-                  if (cleanedData.shipDate) {
+                    
+                    const row = parsedData[i];
+                    if (typeof row !== 'object' || row === null) {
+                      console.warn(`Skipping invalid row at index ${i}`);
+                      continue;
+                    }
+                    
                     try {
-                      const dateValue = new Date(cleanedData.shipDate);
-                      // Check if parsed date is valid
-                      if (!isNaN(dateValue.getTime())) {
-                        cleanedData.shipDate = Timestamp.fromDate(dateValue);
+                      // Clean and map the data
+                      const cleanedData = cleanData(row, columnMapping);
+                      
+                      if (!cleanedData) {
+                        console.warn(`Row ${i} resulted in null data after cleaning, skipping`);
+                        continue;
+                      }
+                      
+                      // Add uploadId and timestamps
+                      cleanedData.uploadId = metaDoc.id;
+                      cleanedData.uploadDate = serverTimestamp();
+                      cleanedData.processedAt = serverTimestamp();
+                      
+                      // Convert shipDate to a Timestamp if it exists
+                      if (cleanedData.shipDate) {
+                        try {
+                          const dateValue = new Date(cleanedData.shipDate);
+                          // Check if parsed date is valid
+                          if (!isNaN(dateValue.getTime())) {
+                            cleanedData.shipDate = Timestamp.fromDate(dateValue);
+                          } else {
+                            console.warn(`Invalid date format for row ${i}:`, cleanedData.shipDate);
+                            // Use current date as fallback
+                            cleanedData.shipDate = Timestamp.now();
+                          }
+                        } catch (e) {
+                          console.warn(`Error parsing date for row ${i}:`, e);
+                          // Use current date as fallback
+                          cleanedData.shipDate = Timestamp.now();
+                        }
                       } else {
-                        console.warn(`Invalid date format for row ${i}:`, cleanedData.shipDate);
-                        // Use current date as fallback
+                        // If no ship date, use current date
                         cleanedData.shipDate = Timestamp.now();
                       }
-                    } catch (e) {
-                      console.warn(`Error parsing date for row ${i}:`, e);
-                      // Use current date as fallback
-                      cleanedData.shipDate = Timestamp.now();
+                      
+                      // Check if this record has a valid tracking ID
+                      if (cleanedData.hasTrackingId) {
+                        recordsWithTrackingId++;
+                      }
+                      
+                      // Create a document reference with a unique ID
+                      const docRef = doc(shippingCollection);
+                      
+                      // Add to batch
+                      currentBatch.set(docRef, cleanedData);
+                      recordCount++;
+                      
+                      // Update UI progress every few records for smoother experience
+                      if (i % 20 === 0) {
+                        const itemProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
+                        setProgress(itemProgress);
+                        setProcessingStatus(`Processing data: ${Math.round((i / parsedData.length) * 100)}%`);
+                      }
+                    } catch (rowError: any) {
+                      console.error(`Error processing row ${i}:`, rowError);
+                      errorCount++;
+                      // Continue with next row despite errors
                     }
-                  } else {
-                    // If no ship date, use current date
-                    cleanedData.shipDate = Timestamp.now();
                   }
                   
-                  // Check if this record has a valid tracking ID
-                  if (cleanedData.hasTrackingId) {
-                    recordsWithTrackingId++;
+                  // Commit any remaining records in the last batch
+                  if (recordCount % batchSize !== 0 && recordCount > 0) {
+                    try {
+                      setProcessingStatus('Saving final records to database...');
+                      await currentBatch.commit();
+                      console.log('Committed final batch successfully');
+                    } catch (batchError: any) {
+                      console.error('Error committing final batch:', batchError);
+                      errorCount++;
+                      toast.error(`Error saving final records: ${batchError.message}`);
+                    }
                   }
                   
-                  // Create a document reference with a unique ID
-                  const docRef = doc(shippingCollection);
-                  
-                  // Add to batch
-                  currentBatch.set(docRef, cleanedData);
-                  recordCount++;
-                  
-                  // Update UI progress every few records for smoother experience
-                  if (i % 20 === 0) {
-                    const itemProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
-                    setProgress(itemProgress);
-                    setProcessingStatus(`Processing data: ${Math.round((i / parsedData.length) * 100)}%`);
-                  }
-                }
-                
-                // Commit any remaining records in the last batch
-                if (recordCount % batchSize !== 0) {
+                  // Update metadata with valid tracking ID count
                   try {
-                    setProcessingStatus('Saving final records to database...');
-                    await currentBatch.commit();
-                    console.log('Committed final batch');
-                  } catch (batchError) {
-                    console.error('Error committing final batch:', batchError);
-                    toast.error('Error saving final batch. Some data may be missing.');
+                    await addDoc(collection(db, 'shippingData_stats'), {
+                      uploadId: metaDoc.id,
+                      totalRecords: recordCount,
+                      recordsWithTrackingId: recordsWithTrackingId,
+                      errorCount: errorCount,
+                      uploadDate: serverTimestamp()
+                    });
+                    console.log('Successfully updated shippingData_stats');
+                  } catch (statsError: any) {
+                    console.error('Error saving stats:', statsError);
+                    // Non-critical error, don't fail the whole operation
                   }
-                }
-                
-                // Update metadata with valid tracking ID count
-                await addDoc(collection(db, 'shippingData_stats'), {
-                  uploadId: metaDoc.id,
-                  totalRecords: recordCount,
-                  recordsWithTrackingId: recordsWithTrackingId,
-                  uploadDate: serverTimestamp()
-                });
-                
-                // Clear timeout as upload was successful
-                if (uploadTimeoutRef.current) {
-                  clearTimeout(uploadTimeoutRef.current);
-                  uploadTimeoutRef.current = null;
-                }
-                
-                // Finalize the upload
-                setProgress(100);
-                setProcessingStatus('Upload complete!');
-                setUploadSuccess(true);
-                setIsLoading(false);
-                console.log(`Successfully uploaded ${recordCount} records to Firestore`);
-                
-                // Display warning if not all records have tracking IDs
-                if (recordsWithTrackingId < recordCount) {
-                  toast.warning(`${recordCount - recordsWithTrackingId} records without Tracking ID will not appear in dashboard.`);
-                }
-                
-                onUploadComplete(true, file.name);
-                toast.success(`${file.name} uploaded successfully!`);
-                
-                // Reset the interface after a short delay
-                setTimeout(() => {
-                  setFile(null);
+                  
+                  // Clear timeout as upload was successful
+                  if (uploadTimeoutRef.current) {
+                    clearTimeout(uploadTimeoutRef.current);
+                    uploadTimeoutRef.current = null;
+                  }
+                  
+                  // Finalize the upload
+                  setProgress(100);
+                  setProcessingStatus('Upload complete!');
+                  setUploadSuccess(true);
+                  setIsLoading(false);
+                  console.log(`Successfully uploaded ${recordCount} records to Firestore (${recordsWithTrackingId} with tracking IDs)`);
+                  
+                  // Display warning if not all records have tracking IDs
+                  if (recordsWithTrackingId < recordCount) {
+                    toast.warning(`${recordCount - recordsWithTrackingId} records without Tracking ID will not appear in dashboard.`);
+                  }
+                  
+                  // Show error summary if any errors occurred
+                  if (errorCount > 0) {
+                    toast.warning(`Upload completed with ${errorCount} errors. Check console for details.`);
+                  }
+                  
+                  onUploadComplete(true, file.name);
+                  toast.success(`${file.name} uploaded successfully!`);
+                  
+                  // Reset the interface after a short delay
+                  setTimeout(() => {
+                    setFile(null);
+                    setProgress(0);
+                  }, 1500);
+                  
+                } catch (err: any) {
+                  // Clear timeout on error
+                  if (uploadTimeoutRef.current) {
+                    clearTimeout(uploadTimeoutRef.current);
+                    uploadTimeoutRef.current = null;
+                  }
+                  
+                  console.error('Error processing CSV data:', err);
+                  setUploadError(`Failed to process data: ${err.message}`);
+                  setIsLoading(false);
                   setProgress(0);
-                }, 1500);
-                
-              } catch (err: any) {
+                  setProcessingStatus('');
+                  onUploadComplete(false);
+                  toast.error(`Failed to process data: ${err.message}`);
+                }
+              },
+              error: function(err: any) {
                 // Clear timeout on error
                 if (uploadTimeoutRef.current) {
                   clearTimeout(uploadTimeoutRef.current);
                   uploadTimeoutRef.current = null;
                 }
                 
-                console.error('Error processing CSV data:', err);
-                setUploadError(`Failed to process data: ${err.message}`);
+                console.error('Error parsing CSV:', err);
+                setUploadError(`Failed to parse CSV: ${err.message}`);
                 setIsLoading(false);
                 setProgress(0);
                 setProcessingStatus('');
                 onUploadComplete(false);
-                toast.error(`Failed to process data: ${err.message}`);
+                toast.error(`Failed to parse CSV: ${err.message}`);
               }
-            },
-            error: function(err: any) {
-              // Clear timeout on error
-              if (uploadTimeoutRef.current) {
-                clearTimeout(uploadTimeoutRef.current);
-                uploadTimeoutRef.current = null;
-              }
-              
-              console.error('Error parsing CSV:', err);
-              setUploadError(`Failed to parse CSV: ${err.message}`);
-              setIsLoading(false);
-              setProgress(0);
-              setProcessingStatus('');
-              onUploadComplete(false);
-              toast.error(`Failed to parse CSV: ${err.message}`);
+            });
+          } catch (downloadError: any) {
+            console.error('Error getting download URL:', downloadError);
+            setUploadError(`Error accessing uploaded file: ${downloadError.message}`);
+            setIsLoading(false);
+            setProgress(0);
+            setProcessingStatus('');
+            
+            if (uploadTimeoutRef.current) {
+              clearTimeout(uploadTimeoutRef.current);
+              uploadTimeoutRef.current = null;
             }
-          });
+            
+            onUploadComplete(false);
+            toast.error(`Error accessing uploaded file: ${downloadError.message}`);
+          }
         }
       );
     } catch (error: any) {
@@ -435,15 +497,6 @@ const ShippingCSVUpload = ({
     }
   };
 
-  // Clean up timeout on component unmount
-  React.useEffect(() => {
-    return () => {
-      if (uploadTimeoutRef.current) {
-        clearTimeout(uploadTimeoutRef.current);
-      }
-    };
-  }, []);
-
   return (
     <div className="space-y-4">
       <Card className={`border border-dashed p-6 text-center ${isDragActive ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/25'}`}>
@@ -452,6 +505,7 @@ const ShippingCSVUpload = ({
           className="flex flex-col items-center justify-center space-y-2 py-4 cursor-pointer"
         >
           <input {...getInputProps()} />
+          
           <div className="rounded-full bg-primary/10 p-3">
             <Upload className="h-6 w-6 text-primary" />
           </div>

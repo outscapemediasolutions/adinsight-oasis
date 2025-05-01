@@ -101,9 +101,9 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
   
   const handleConfirm = () => {
     // Validate before confirming
-    const missing = validateRequiredFields(mapping);
+    const missingFields = validateRequiredFields(mapping);
     
-    if (!missing) {
+    if (!missingFields) {
       toast.warning(`Please map all required fields before continuing`);
       return;
     }

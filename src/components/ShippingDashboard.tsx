@@ -207,7 +207,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           codCharges: typeof data.codCharges === 'string' ? parseFloat(data.codCharges) : Number(data.codCharges || 0),
           shippingCharges: typeof data.shippingCharges === 'string' ? parseFloat(data.shippingCharges) : Number(data.shippingCharges || 0),
           freightTotalAmount: typeof data.freightTotalAmount === 'string' ? parseFloat(data.freightTotalAmount) : Number(data.freightTotalAmount || 0),
-          hasTrackingId: true // Since we're filtering for this
+          hasTrackingId: Boolean(data.hasTrackingId)
         };
         
         processedOrders.push(order);
@@ -260,7 +260,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       return (
         <Card className="p-8 text-center border border-muted/20 bg-card/90 backdrop-blur-sm">
           <h3 className="text-lg font-medium mb-2">No data available for the selected date range</h3>
-          <p className="text-muted-foreground mb-4">Try selecting a different date range or reset to view all data</p>
+          <p className="text-sm text-muted-foreground mb-4">Try selecting a different date range or reset to view all data</p>
           <Button onClick={handleResetDateRange} className="bg-white/10 hover:bg-white/20 text-white">
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset Date Range
