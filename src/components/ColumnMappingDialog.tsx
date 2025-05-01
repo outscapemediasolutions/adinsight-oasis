@@ -135,7 +135,7 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
         </DialogHeader>
         
         {missingRequiredFields.length > 0 && (
-          <Alert variant="warning" className="mb-4">
+          <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               Please map these required fields: {missingRequiredFields.join(', ')}
