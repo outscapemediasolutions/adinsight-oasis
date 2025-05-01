@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
@@ -59,6 +58,9 @@ const ShippingCSVUpload = ({
       if (isEmpty) {
         if (numericalFields.includes(fieldKey)) {
           value = 0;
+        } else if (fieldKey === "trackingId") {
+          // Special handling for Tracking ID - keep as empty string when NULL
+          value = "";
         } else {
           value = ""; // Empty string for string fields
         }
@@ -70,6 +72,9 @@ const ShippingCSVUpload = ({
       // Add to cleaned data
       cleaned[fieldKey] = value;
     });
+    
+    // Add a marker to indicate if this record has a valid tracking ID
+    cleaned.hasTrackingId = cleaned.trackingId && cleaned.trackingId.trim() !== '';
     
     return cleaned;
   };
@@ -154,12 +159,14 @@ const ShippingCSVUpload = ({
     setUploadSuccess(false);
     setUploadError('');
     setProcessingStatus('Preparing upload...');
+    setProgress(5); // Start with 5% to show activity
     
     // Set a timeout to abort if the upload takes too long
     uploadTimeoutRef.current = setTimeout(() => {
       setUploadError('Upload timed out after 30 seconds. Please try again.');
       setIsLoading(false);
       setProcessingStatus('');
+      setProgress(0);
       onUploadComplete(false);
       toast.error('Upload timed out after 30 seconds.');
     }, 30000);
@@ -184,9 +191,11 @@ const ShippingCSVUpload = ({
           setUploadError('File upload failed. Please try again.');
           setIsLoading(false);
           setProcessingStatus('');
+          setProgress(0);
           
           if (uploadTimeoutRef.current) {
             clearTimeout(uploadTimeoutRef.current);
+            uploadTimeoutRef.current = null;
           }
           
           onUploadComplete(false);
@@ -308,17 +317,12 @@ const ShippingCSVUpload = ({
                     cleanedData.shipDate = Timestamp.now();
                   }
                   
-                  // Flag to indicate if this record has a valid tracking ID
-                  const hasTrackingId = cleanedData.trackingId && cleanedData.trackingId.trim() !== '';
-                  
-                  // Add a marker to indicate if this record has a tracking ID (for filtering in dashboard)
-                  cleanedData.hasTrackingId = hasTrackingId;
-                  
-                  if (hasTrackingId) {
+                  // Check if this record has a valid tracking ID
+                  if (cleanedData.hasTrackingId) {
                     recordsWithTrackingId++;
                   }
                   
-                  // Create a document reference with a unique ID based on orderId + index
+                  // Create a document reference with a unique ID
                   const docRef = doc(shippingCollection);
                   
                   // Add to batch
@@ -374,7 +378,7 @@ const ShippingCSVUpload = ({
                 onUploadComplete(true, file.name);
                 toast.success(`${file.name} uploaded successfully!`);
                 
-                // Navigate to the dashboard automatically after a short delay
+                // Reset the interface after a short delay
                 setTimeout(() => {
                   setFile(null);
                   setProgress(0);
@@ -390,6 +394,7 @@ const ShippingCSVUpload = ({
                 console.error('Error processing CSV data:', err);
                 setUploadError(`Failed to process data: ${err.message}`);
                 setIsLoading(false);
+                setProgress(0);
                 setProcessingStatus('');
                 onUploadComplete(false);
                 toast.error(`Failed to process data: ${err.message}`);
@@ -405,6 +410,7 @@ const ShippingCSVUpload = ({
               console.error('Error parsing CSV:', err);
               setUploadError(`Failed to parse CSV: ${err.message}`);
               setIsLoading(false);
+              setProgress(0);
               setProcessingStatus('');
               onUploadComplete(false);
               toast.error(`Failed to parse CSV: ${err.message}`);
@@ -422,6 +428,7 @@ const ShippingCSVUpload = ({
       console.error('Error starting upload:', error);
       setUploadError(`Upload failed: ${error.message}`);
       setIsLoading(false);
+      setProgress(0);
       setProcessingStatus('');
       onUploadComplete(false);
       toast.error(`Upload failed: ${error.message}`);

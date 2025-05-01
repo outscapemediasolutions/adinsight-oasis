@@ -128,33 +128,41 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
         q = query(
           shippingDataRef,
           where("shipDate", ">=", startTimestamp),
-          where("shipDate", "<=", endTimestamp)
+          where("shipDate", "<=", endTimestamp),
+          // Only include documents that have a tracking ID
+          where("hasTrackingId", "==", true)
         );
       } else {
-        console.log("No date range filter, fetching all data");
-        q = query(shippingDataRef);
+        console.log("No date range filter, fetching all data with tracking IDs");
+        q = query(
+          shippingDataRef,
+          where("hasTrackingId", "==", true)
+        );
       }
       
+      // Get count of all records (with and without tracking ID)
+      const countAllQuery = query(shippingDataRef);
+      const countAllSnapshot = await getDocs(countAllQuery);
+      const allRecordsCount = countAllSnapshot.size;
+      setTotalOrders(allRecordsCount);
+      
+      // Get records with tracking ID
       const querySnapshot = await getDocs(q);
-      console.log(`Fetched ${querySnapshot.size} documents from Firestore`);
+      console.log(`Fetched ${querySnapshot.size} documents with tracking IDs from Firestore`);
+      setFilteredOrders(querySnapshot.size);
       
       if (querySnapshot.empty) {
         setOrders([]);
         setMetrics(null);
         setIsLoading(false);
-        setTotalOrders(0);
-        setFilteredOrders(0);
         return;
       }
       
       // Process orders
       const processedOrders: ShippingOrder[] = [];
-      let withTrackingId = 0;
-      let totalFetched = 0;
       
       querySnapshot.forEach(doc => {
         const data = doc.data() as ShippingDocumentData;
-        totalFetched++;
         
         // Convert date strings or Firestore timestamps to Date objects
         let shipDate: Date;
@@ -173,14 +181,6 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           console.error("Error processing date:", e);
           shipDate = new Date(); // Fallback to current date
         }
-        
-        // Check if this order has a valid tracking ID
-        const hasValidTrackingId = 
-          data.trackingId && 
-          typeof data.trackingId === 'string' && 
-          data.trackingId.trim() !== '';
-        
-        if (hasValidTrackingId) withTrackingId++;
         
         // Create order object with proper type conversions
         const order: ShippingOrder = {
@@ -207,19 +207,14 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           codCharges: typeof data.codCharges === 'string' ? parseFloat(data.codCharges) : Number(data.codCharges || 0),
           shippingCharges: typeof data.shippingCharges === 'string' ? parseFloat(data.shippingCharges) : Number(data.shippingCharges || 0),
           freightTotalAmount: typeof data.freightTotalAmount === 'string' ? parseFloat(data.freightTotalAmount) : Number(data.freightTotalAmount || 0),
-          hasTrackingId: hasValidTrackingId
+          hasTrackingId: true // Since we're filtering for this
         };
         
-        // Only add orders with valid tracking IDs to the processed orders for dashboard display
-        if (hasValidTrackingId) {
-          processedOrders.push(order);
-        }
+        processedOrders.push(order);
       });
       
-      console.log(`Successfully processed ${processedOrders.length} orders with tracking IDs out of ${totalFetched} total orders`);
+      console.log(`Successfully processed ${processedOrders.length} orders with tracking IDs`);
       setOrders(processedOrders);
-      setTotalOrders(totalFetched);
-      setFilteredOrders(processedOrders.length);
       
       // Calculate metrics using our utility function
       const calculatedMetrics = calculateMetrics(processedOrders);
