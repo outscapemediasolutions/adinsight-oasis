@@ -45,6 +45,8 @@ const ShippingCSVUpload = ({
   const cleanData = (data: any, mapping: Record<string, string>) => {
     if (!data) return null;
     
+    console.log("Cleaning data with mapping:", mapping);
+    
     // Create a new object for the cleaned data
     const cleaned: any = {};
     
@@ -86,7 +88,7 @@ const ShippingCSVUpload = ({
     // Add a marker to indicate if this record has a valid tracking ID
     cleaned.hasTrackingId = cleaned.trackingId && cleaned.trackingId.trim() !== '';
     
-    console.log("Cleaned data:", cleaned); // Debug log
+    console.log("Cleaned data result:", cleaned); // Debug log
     
     return cleaned;
   };
@@ -116,6 +118,7 @@ const ShippingCSVUpload = ({
         preview: 1, // Only parse the first row to get headers
         skipEmptyLines: true,
         complete: function(results) {
+          console.log("Preview parse results:", results);
           if (results.data && Array.isArray(results.data) && results.data.length > 0) {
             const firstRow = results.data[0];
             if (typeof firstRow === 'object' && firstRow !== null) {
@@ -271,8 +274,8 @@ const ShippingCSVUpload = ({
                   setProgress(50);
                   setProcessingStatus('Preparing data for database...');
                   
-                  // Process data in batches to avoid Firestore limits
-                  const batchSize = 200; // Keep well under Firestore's limit
+                  // Process data in smaller batches to avoid Firestore limits
+                  const batchSize = 100; // Keep well under Firestore's limit (was 200)
                   let currentBatch = writeBatch(db);
                   let batchCount = 0;
                   let recordCount = 0;
@@ -281,13 +284,14 @@ const ShippingCSVUpload = ({
                   
                   const shippingCollection = collection(db, 'shippingData');
                   
+                  // Process in smaller chunks with batch commits between
                   for (let i = 0; i < parsedData.length; i++) {
                     // Commit the current batch and create a new one if we've reached the limit
                     if (i > 0 && i % batchSize === 0) {
                       try {
                         setProcessingStatus(`Saving batch ${++batchCount} to database...`);
                         await currentBatch.commit();
-                        console.log(`Committed batch ${batchCount} successfully`);
+                        console.log(`Committed batch ${batchCount} successfully (${i}/${parsedData.length})`);
                         
                         // Calculate overall progress (50% for initial steps + up to 45% for batches)
                         const batchProgress = Math.min(95, 50 + Math.round((i / parsedData.length) * 45));
@@ -429,6 +433,7 @@ const ShippingCSVUpload = ({
                   setTimeout(() => {
                     setFile(null);
                     setProgress(0);
+                    setProcessingStatus('');
                   }, 1500);
                   
                 } catch (err: any) {
