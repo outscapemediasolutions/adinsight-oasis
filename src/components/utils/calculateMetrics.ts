@@ -80,47 +80,73 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
   
   // 1. Order Volume and Revenue
   const totalOrders = validOrders.length;
-  const totalRevenue = validOrders.reduce((sum, order) => sum + order.orderTotal, 0);
+  const totalRevenue = validOrders.reduce((sum, order) => {
+    const orderTotal = typeof order.orderTotal === 'number' 
+      ? order.orderTotal 
+      : parseFloat(order.orderTotal as string) || 0;
+    return sum + orderTotal;
+  }, 0);
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const totalDiscounts = validOrders.reduce((sum, order) => sum + (order.discountValue || 0), 0);
+  
+  const totalDiscounts = validOrders.reduce((sum, order) => {
+    const discountValue = typeof order.discountValue === 'number' 
+      ? order.discountValue 
+      : parseFloat(order.discountValue as string) || 0;
+    return sum + discountValue;
+  }, 0);
+  
   const discountPercentage = totalRevenue > 0 ? (totalDiscounts / totalRevenue) * 100 : 0;
   
-  // 2. Order Status Distribution
+  // 2. Order Status Distribution - handle empty/null values
   const statusData: Record<string, number> = {};
   validOrders.forEach(order => {
-    const status = order.status || "Unknown";
+    const status = order.status && typeof order.status === 'string' && order.status.trim() !== '' 
+      ? order.status 
+      : "Unknown";
     statusData[status] = (statusData[status] || 0) + 1;
   });
   
-  // 3. Payment Method Distribution
+  // 3. Payment Method Distribution - handle empty/null values
   const paymentData: Record<string, number> = {};
   validOrders.forEach(order => {
-    const method = order.paymentMethod || "Unknown";
+    const method = order.paymentMethod && typeof order.paymentMethod === 'string' && order.paymentMethod.trim() !== '' 
+      ? order.paymentMethod 
+      : "Unknown";
     paymentData[method] = (paymentData[method] || 0) + 1;
   });
   
-  // 4. Geographic Distribution
+  // 4. Geographic Distribution - handle empty/null values
   const stateData: Record<string, number> = {};
   validOrders.forEach(order => {
-    const state = order.addressState || "Unknown";
+    const state = order.addressState && typeof order.addressState === 'string' && order.addressState.trim() !== '' 
+      ? order.addressState 
+      : "Unknown";
     stateData[state] = (stateData[state] || 0) + 1;
   });
   
-  // 5. Courier Performance
+  // 5. Courier Performance - handle empty/null values
   const courierData: Record<string, { total: number, delivered: number, rto: number, totalCharges: number }> = {};
   validOrders.forEach(order => {
-    const courier = order.courierCompany || "Unknown";
+    const courier = order.courierCompany && typeof order.courierCompany === 'string' && order.courierCompany.trim() !== '' 
+      ? order.courierCompany 
+      : "Unknown";
+    
     if (!courierData[courier]) {
       courierData[courier] = { total: 0, delivered: 0, rto: 0, totalCharges: 0 };
     }
     courierData[courier].total += 1;
-    courierData[courier].totalCharges += (order.freightTotalAmount || 0);
     
-    if (order.status) {
+    const freightTotal = typeof order.freightTotalAmount === 'number' 
+      ? order.freightTotalAmount 
+      : parseFloat(order.freightTotalAmount as string) || 0;
+    
+    courierData[courier].totalCharges += freightTotal;
+    
+    if (order.status && typeof order.status === 'string') {
       const status = order.status.toUpperCase();
-      if (status.includes("DELIVER")) {
+      if (status.includes("DELIVER") || status.includes("COMPLETED")) {
         courierData[courier].delivered += 1;
-      } else if (status.includes("RTO")) {
+      } else if (status.includes("RTO") || status.includes("RETURN")) {
         courierData[courier].rto += 1;
       }
     }
@@ -135,34 +161,72 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
     total: data.total
   }));
   
-  // 6. Weight Analysis
+  // 6. Weight Analysis - handle type conversions
   const weightDiscrepancy = validOrders.reduce((sum, order) => {
-    return sum + ((order.chargedWeight || 0) - (order.weight || 0));
+    const chargedWeight = typeof order.chargedWeight === 'number' 
+      ? order.chargedWeight 
+      : parseFloat(order.chargedWeight as string) || 0;
+    
+    const actualWeight = typeof order.weight === 'number' 
+      ? order.weight 
+      : parseFloat(order.weight as string) || 0;
+    
+    return sum + (chargedWeight - actualWeight);
   }, 0) / (validOrders.length || 1);
   
-  // 7. COD Analysis
+  // 7. COD Analysis - handle type conversions and empty/null values
   const codOrders = validOrders.filter(order => 
     order.paymentMethod && 
     typeof order.paymentMethod === 'string' && 
     order.paymentMethod.toUpperCase().includes("COD")
   );
   
-  const totalCodAmount = codOrders.reduce((sum, order) => sum + (order.codPayableAmount || 0), 0);
-  const totalRemitted = codOrders.reduce((sum, order) => sum + (order.remittedAmount || 0), 0);
+  const totalCodAmount = codOrders.reduce((sum, order) => {
+    const codAmount = typeof order.codPayableAmount === 'number' 
+      ? order.codPayableAmount 
+      : parseFloat(order.codPayableAmount as string) || 0;
+    return sum + codAmount;
+  }, 0);
+  
+  const totalRemitted = codOrders.reduce((sum, order) => {
+    const remitted = typeof order.remittedAmount === 'number' 
+      ? order.remittedAmount 
+      : parseFloat(order.remittedAmount as string) || 0;
+    return sum + remitted;
+  }, 0);
+  
   const codCollectionRate = totalCodAmount > 0 ? (totalRemitted / totalCodAmount) * 100 : 0;
+  
   const avgCodCharges = codOrders.length > 0 
-    ? codOrders.reduce((sum, order) => sum + (order.codCharges || 0), 0) / codOrders.length
+    ? codOrders.reduce((sum, order) => {
+        const codCharges = typeof order.codCharges === 'number' 
+          ? order.codCharges 
+          : parseFloat(order.codCharges as string) || 0;
+        return sum + codCharges;
+      }, 0) / codOrders.length
     : 0;
   
-  // 8. Product Analysis
+  // 8. Product Analysis - handle empty/null values
   const productData: Record<string, { quantity: number, revenue: number }> = {};
   validOrders.forEach(order => {
-    const product = order.productName || "Unknown";
+    const product = order.productName && typeof order.productName === 'string' && order.productName.trim() !== '' 
+      ? order.productName 
+      : "Unknown";
+    
     if (!productData[product]) {
       productData[product] = { quantity: 0, revenue: 0 };
     }
-    productData[product].quantity += (order.productQuantity || 1);
-    productData[product].revenue += order.orderTotal;
+    
+    const quantity = typeof order.productQuantity === 'number' 
+      ? order.productQuantity 
+      : parseInt(order.productQuantity as string, 10) || 1;
+    
+    const orderTotal = typeof order.orderTotal === 'number' 
+      ? order.orderTotal 
+      : parseFloat(order.orderTotal as string) || 0;
+    
+    productData[product].quantity += quantity;
+    productData[product].revenue += orderTotal;
   });
   
   // Get top products
@@ -171,15 +235,34 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10);
   
-  // 9. Order Volume by Date
+  // 9. Order Volume by Date - handle date conversion and ensure valid dates
   const ordersByDate: Record<string, { date: string, orders: number, revenue: number }> = {};
   validOrders.forEach(order => {
-    // Ensure we have a valid date object
-    if (!order.shipDate || !(order.shipDate instanceof Date) || isNaN(order.shipDate.getTime())) {
+    // Handle different date formats and types
+    let dateObj: Date | null = null;
+    
+    if (order.shipDate) {
+      if (order.shipDate instanceof Date) {
+        dateObj = order.shipDate;
+      } else if (typeof order.shipDate === 'object' && 'toDate' in order.shipDate && typeof order.shipDate.toDate === 'function') {
+        // Handle Firestore Timestamp objects
+        dateObj = order.shipDate.toDate();
+      } else if (typeof order.shipDate === 'string') {
+        // Try parsing string date
+        dateObj = new Date(order.shipDate);
+      } else if (typeof order.shipDate === 'number') {
+        // Handle numeric timestamp
+        dateObj = new Date(order.shipDate);
+      }
+    }
+    
+    // Skip if we couldn't parse a valid date
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      console.warn("Invalid date for order:", order);
       return;
     }
     
-    const dateStr = format(order.shipDate, 'yyyy-MM-dd');
+    const dateStr = format(dateObj, 'yyyy-MM-dd');
     
     if (!ordersByDate[dateStr]) {
       ordersByDate[dateStr] = {
@@ -190,18 +273,31 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
     }
     
     ordersByDate[dateStr].orders += 1;
-    ordersByDate[dateStr].revenue += order.orderTotal;
+    
+    const orderTotal = typeof order.orderTotal === 'number' 
+      ? order.orderTotal 
+      : parseFloat(order.orderTotal as string) || 0;
+    
+    ordersByDate[dateStr].revenue += orderTotal;
   });
   
   const orderVolumeByDate = Object.values(ordersByDate)
     .sort((a, b) => a.date.localeCompare(b.date));
   
-  // 10. Customer Analysis
+  // 10. Customer Analysis - handle empty/null values
   const customerData: Record<string, number> = {};
   validOrders.forEach(order => {
-    if (order.customerEmail && order.customerEmail.trim() !== '') {
-      customerData[order.customerEmail] = (customerData[order.customerEmail] || 0) + 1;
+    let customerKey = "Unknown";
+    
+    if (order.customerEmail && typeof order.customerEmail === 'string' && order.customerEmail.trim() !== '') {
+      customerKey = order.customerEmail;
+    } else if (order.customerMobile && typeof order.customerMobile === 'string' && order.customerMobile.trim() !== '') {
+      customerKey = order.customerMobile;
+    } else if (order.customerName && typeof order.customerName === 'string' && order.customerName.trim() !== '') {
+      customerKey = order.customerName;
     }
+    
+    customerData[customerKey] = (customerData[customerKey] || 0) + 1;
   });
   
   const uniqueCustomers = Object.keys(customerData).length;

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
@@ -41,7 +40,7 @@ const ShippingCSVUpload = ({
     };
   }, []);
 
-  // Helper function to clean data and handle missing values
+  // Helper function to clean data and handle all types of missing values
   const cleanData = (data: any, mapping: Record<string, string>) => {
     if (!data) return null;
     
@@ -58,7 +57,8 @@ const ShippingCSVUpload = ({
       let value = data[csvHeader];
       
       // Check if the value is missing or empty
-      const isEmpty = value === undefined || value === null || value === "" || value === "N/A";
+      const isEmpty = value === undefined || value === null || value === "" || 
+                      value === "N/A" || value === "NULL" || value === "null";
       
       // Handle numerical fields (replace empty with 0)
       const numericalFields = [
@@ -163,13 +163,7 @@ const ShippingCSVUpload = ({
       return;
     }
     
-    // Verify tracking ID is mapped (primary field)
-    if (!columnMapping.trackingId) {
-      toast.error("Tracking ID must be mapped as it's the primary field");
-      return;
-    }
-    
-    // Verify required fields are mapped
+    // Verify key columns are mapped
     const requiredFields = ["orderId", "shipDate", "productQuantity"];
     const missingFields = requiredFields.filter(field => !columnMapping[field]);
     if (missingFields.length > 0) {
@@ -209,7 +203,6 @@ const ShippingCSVUpload = ({
         'state_changed',
         (snapshot) => {
           const uploadProgress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 20); // First 20% for file upload
-          console.log(`Upload progress: ${uploadProgress}%`);
           setProgress(uploadProgress);
           setProcessingStatus(`Uploading file: ${uploadProgress}%`);
         },
@@ -527,7 +520,7 @@ const ShippingCSVUpload = ({
       {Object.keys(columnMapping).length > 0 && (
         <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-muted">
           <p className="font-medium mb-1">Column mapping applied:</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-24 overflow-y-auto">
             {Object.entries(columnMapping).map(([key, value]) => (
               value && value !== "not-mapped" && (
                 <div key={key} className="flex justify-between">
