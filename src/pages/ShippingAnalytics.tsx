@@ -49,10 +49,39 @@ const ShippingAnalytics = () => {
     // Create a sample row with empty values
     const sampleRow = headers.map(() => "");
     
+    // Add a second row with some values but missing Tracking ID
+    const sampleRow2 = headers.map((header) => {
+      switch(header) {
+        case "Order ID": return "1000";
+        case "Ship Date": return "2023-05-01";
+        case "Status": return "Delivered";
+        case "Product Name": return "Test Product";
+        case "Product Quantity": return "1";
+        case "Order Total": return "1000";
+        default: return "";
+      }
+    });
+    
+    // Add a third row with Tracking ID
+    const sampleRow3 = headers.map((header) => {
+      switch(header) {
+        case "Order ID": return "1001";
+        case "Tracking ID": return "TRACK123456"; // Has tracking ID
+        case "Ship Date": return "2023-05-02";
+        case "Status": return "In Transit";
+        case "Product Name": return "Sample Product";
+        case "Product Quantity": return "2";
+        case "Order Total": return "2000";
+        default: return "";
+      }
+    });
+    
     // Create CSV content
     const csvContent = [
       headers.join(","),
-      sampleRow.join(",")
+      sampleRow.join(","),
+      sampleRow2.join(","),
+      sampleRow3.join(",")
     ].join("\n");
     
     // Create a Blob with the CSV content
@@ -75,7 +104,6 @@ const ShippingAnalytics = () => {
     console.log("Upload start handler triggered");
     setUploadSuccess(false);
     setUploadFilename(null);
-    setColumnMapping({});
   };
   
   const handleHeadersDetected = (headers: string[]) => {
@@ -93,7 +121,9 @@ const ShippingAnalytics = () => {
     if (success) {
       handleUploadSuccess();
       // Switch to dashboard tab to show the uploaded data
-      setActiveTab("dashboard");
+      setTimeout(() => {
+        setActiveTab("dashboard");
+      }, 2000);
     }
   };
 
@@ -105,6 +135,7 @@ const ShippingAnalytics = () => {
   const handleColumnMappingConfirm = (mapping: Record<string, string>) => {
     console.log("Column mapping confirmed:", mapping);
     setColumnMapping(mapping);
+    setShowColumnMappingDialog(false);
     toast.success("Column mapping applied. Please proceed with the upload.");
   };
   
@@ -141,6 +172,11 @@ const ShippingAnalytics = () => {
               <CardTitle>Upload Shipping Data</CardTitle>
               <CardDescription>
                 Upload your shipping data in CSV format to analyze your logistics performance.
+                {csvHeaders.length > 0 && columnMapping && Object.keys(columnMapping).length > 0 && (
+                  <div className="mt-2 text-xs text-green-500">
+                    Column mapping is set. You can now upload your data.
+                  </div>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -159,7 +195,7 @@ const ShippingAnalytics = () => {
                     onClick={() => setShowColumnMappingDialog(true)}
                     className="text-xs"
                   >
-                    Modify Column Mapping
+                    {Object.keys(columnMapping).length > 0 ? "Modify Column Mapping" : "Set Column Mapping"}
                   </Button>
                 </div>
               )}
@@ -186,75 +222,95 @@ const ShippingAnalytics = () => {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <p>
-                  The CSV file should contain the following columns:
+                  The CSV file should contain the following columns. Don't worry if your column names are different - 
+                  you'll be able to map them during upload.
                 </p>
                 <div className="rounded-md border overflow-auto max-h-[50vh]">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Column Name</TableHead>
+                        <TableHead className="w-[200px]">Field Name</TableHead>
                         <TableHead>Description</TableHead>
+                        <TableHead className="w-[100px]">Required</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       <TableRow>
                         <TableCell className="font-medium">Order ID</TableCell>
                         <TableCell>Unique identifier for the order</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Tracking ID</TableCell>
-                        <TableCell>Tracking number for the shipment (Primary field)</TableCell>
+                        <TableCell>Tracking number for the shipment (Primary field - only orders with this will display in dashboard)</TableCell>
+                        <TableCell>Yes *</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Ship Date</TableCell>
                         <TableCell>Date when the order was shipped</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Status</TableCell>
                         <TableCell>Current status of the order (DELIVERED, RTO, etc.)</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Product Name</TableCell>
                         <TableCell>Name of the product</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Product Quantity</TableCell>
                         <TableCell>Quantity of products ordered</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Order Total</TableCell>
                         <TableCell>Total amount of the order</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Courier Company</TableCell>
-                        <TableCell>Name of the courier service used</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Weight (KG)</TableCell>
-                        <TableCell>Actual weight of the package</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">Charged Weight</TableCell>
-                        <TableCell>Weight used for calculating shipping charges</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">COD Payble Amount</TableCell>
-                        <TableCell>Amount to be collected for COD orders</TableCell>
+                        <TableCell>Yes</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell className="font-medium">Payment Method</TableCell>
                         <TableCell>Method of payment (COD, Prepaid)</TableCell>
+                        <TableCell>No</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Courier Company</TableCell>
+                        <TableCell>Name of the courier service used</TableCell>
+                        <TableCell>No</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Weight (KG)</TableCell>
+                        <TableCell>Actual weight of the package</TableCell>
+                        <TableCell>No</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Charged Weight</TableCell>
+                        <TableCell>Weight used for calculating shipping charges</TableCell>
+                        <TableCell>No</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">COD Payble Amount</TableCell>
+                        <TableCell>Amount to be collected for COD orders</TableCell>
+                        <TableCell>No</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  You can download a sample template above to ensure your data is formatted correctly.
-                  <br />
-                  <span className="text-yellow-500">
-                    Note: Empty cells will be treated as empty strings for text fields and zeros for numeric fields.
-                    Only records with a valid Tracking ID will be shown in the dashboard.
-                  </span>
+                <p className="text-sm text-muted-foreground mt-4">
+                  * Tracking ID is required for orders to appear in the dashboard, but the system will still upload records without it.
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Empty cells in your CSV will be treated as follows:
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                  <li>Empty text fields: Will show as blank in the system</li>
+                  <li>Empty numerical fields: Will be saved as 0</li>
+                  <li>Rows without Tracking ID: Will be uploaded but not shown in dashboard</li>
+                </ul>
+                <p className="text-sm text-yellow-500 mt-2">
+                  If your CSV has different column names, don't worry! You'll be able to map them after selecting your file.
                 </p>
               </div>
               <DialogFooter>

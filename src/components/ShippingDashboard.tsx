@@ -1,18 +1,22 @@
 
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/services/firebase";
-import { collection, query, where, getDocs, orderBy, limit, Timestamp, DocumentData } from "firebase/firestore";
-import { format } from "date-fns";
-import { RefreshCw, Upload, RotateCcw } from "lucide-react";
+import { 
+  collection, query, where, getDocs, orderBy, limit, 
+  Timestamp, DocumentData, startAfter, endAt
+} from "firebase/firestore";
+import { format, isSameDay } from "date-fns";
+import { RefreshCw, Upload, RotateCcw, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ShippingAnalyticsSummary } from "./ShippingAnalyticsSummary";
 import { ShippingCharts } from "./charts/ShippingCharts";
 import { calculateMetrics, ShippingMetrics } from "./utils/calculateMetrics";
+import { Alert, AlertDescription } from "./ui/alert";
 
 interface ShippingDashboardProps {
   dateRange: { start?: Date; end?: Date };
@@ -42,6 +46,7 @@ export interface ShippingOrder {
   codCharges: number;
   shippingCharges: number;
   freightTotalAmount: number;
+  hasTrackingId?: boolean;
 }
 
 export interface ShippingDocumentData extends DocumentData {
@@ -67,6 +72,7 @@ export interface ShippingDocumentData extends DocumentData {
   codCharges?: string | number;
   shippingCharges?: string | number;
   freightTotalAmount?: string | number;
+  hasTrackingId?: boolean;
 }
 
 const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
@@ -76,6 +82,9 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   const [orders, setOrders] = useState<ShippingOrder[]>([]);
   const [metrics, setMetrics] = useState<ShippingMetrics | null>(null);
   const [hasData, setHasData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalOrders, setTotalOrders] = useState<number>(0);
+  const [filteredOrders, setFilteredOrders] = useState<number>(0);
   
   useEffect(() => {
     if (!currentUser) return;
@@ -88,9 +97,10 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
     if (!currentUser) return;
     
     setIsLoading(true);
+    setError(null);
     try {
       console.log("Starting data fetch from Firestore...");
-      const shippingDataRef = collection(db, "users", currentUser.uid, "shippingData");
+      const shippingDataRef = collection(db, "shippingData");
       
       // First check if any data exists overall
       const checkDataQuery = query(shippingDataRef, limit(1));
@@ -113,17 +123,16 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
         console.log("Filtering by date range:", dateRange.start, "to", dateRange.end);
         // Convert JavaScript Date objects to Firestore Timestamps
         const startTimestamp = Timestamp.fromDate(dateRange.start);
-        const endTimestamp = Timestamp.fromDate(dateRange.end);
+        const endTimestamp = Timestamp.fromDate(new Date(dateRange.end.setHours(23, 59, 59, 999))); // End of the day
         
         q = query(
           shippingDataRef,
           where("shipDate", ">=", startTimestamp),
-          where("shipDate", "<=", endTimestamp),
-          orderBy("shipDate", "desc")
+          where("shipDate", "<=", endTimestamp)
         );
       } else {
         console.log("No date range filter, fetching all data");
-        q = query(shippingDataRef, orderBy("shipDate", "desc"));
+        q = query(shippingDataRef);
       }
       
       const querySnapshot = await getDocs(q);
@@ -133,15 +142,19 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
         setOrders([]);
         setMetrics(null);
         setIsLoading(false);
+        setTotalOrders(0);
+        setFilteredOrders(0);
         return;
       }
       
       // Process orders
       const processedOrders: ShippingOrder[] = [];
+      let withTrackingId = 0;
+      let totalFetched = 0;
       
       querySnapshot.forEach(doc => {
         const data = doc.data() as ShippingDocumentData;
-        console.log("Processing document:", doc.id);
+        totalFetched++;
         
         // Convert date strings or Firestore timestamps to Date objects
         let shipDate: Date;
@@ -160,6 +173,14 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           console.error("Error processing date:", e);
           shipDate = new Date(); // Fallback to current date
         }
+        
+        // Check if this order has a valid tracking ID
+        const hasValidTrackingId = 
+          data.trackingId && 
+          typeof data.trackingId === 'string' && 
+          data.trackingId.trim() !== '';
+        
+        if (hasValidTrackingId) withTrackingId++;
         
         // Create order object with proper type conversions
         const order: ShippingOrder = {
@@ -185,14 +206,20 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           remittedAmount: typeof data.remittedAmount === 'string' ? parseFloat(data.remittedAmount) : Number(data.remittedAmount || 0),
           codCharges: typeof data.codCharges === 'string' ? parseFloat(data.codCharges) : Number(data.codCharges || 0),
           shippingCharges: typeof data.shippingCharges === 'string' ? parseFloat(data.shippingCharges) : Number(data.shippingCharges || 0),
-          freightTotalAmount: typeof data.freightTotalAmount === 'string' ? parseFloat(data.freightTotalAmount) : Number(data.freightTotalAmount || 0)
+          freightTotalAmount: typeof data.freightTotalAmount === 'string' ? parseFloat(data.freightTotalAmount) : Number(data.freightTotalAmount || 0),
+          hasTrackingId: hasValidTrackingId
         };
         
-        processedOrders.push(order);
+        // Only add orders with valid tracking IDs to the processed orders for dashboard display
+        if (hasValidTrackingId) {
+          processedOrders.push(order);
+        }
       });
       
-      console.log(`Successfully processed ${processedOrders.length} orders`);
+      console.log(`Successfully processed ${processedOrders.length} orders with tracking IDs out of ${totalFetched} total orders`);
       setOrders(processedOrders);
+      setTotalOrders(totalFetched);
+      setFilteredOrders(processedOrders.length);
       
       // Calculate metrics using our utility function
       const calculatedMetrics = calculateMetrics(processedOrders);
@@ -200,6 +227,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
       
     } catch (error) {
       console.error("Error fetching shipping data:", error);
+      setError(`Failed to load shipping data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       toast.error("Failed to load shipping data");
     } finally {
       setIsLoading(false);
@@ -220,6 +248,15 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   const handleResetDateRange = () => {
     navigate("/shipping-analytics");
   };
+  
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
   
   if (!isLoading && orders.length === 0) {
     // Handle different empty state scenarios
@@ -252,7 +289,14 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          {totalOrders > 0 && filteredOrders < totalOrders && (
+            <div className="text-sm text-yellow-400">
+              Showing {filteredOrders} orders with tracking IDs out of {totalOrders} total orders.
+            </div>
+          )}
+        </div>
         <Button 
           variant="outline" 
           size="sm" 

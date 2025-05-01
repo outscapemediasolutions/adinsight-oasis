@@ -1,12 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import { storage, db, auth } from "@/services/firebase";
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, HelpCircle, X } from "lucide-react";
+import { storage, db } from "@/services/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, writeBatch, doc, Timestamp } from "firebase/firestore";
 import Papa from 'papaparse';
@@ -30,6 +30,7 @@ const ShippingCSVUpload = ({
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [processingStatus, setProcessingStatus] = useState('');
+  const uploadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to clean data and handle missing values
   const cleanData = (data: any, mapping: Record<string, string>) => {
@@ -130,9 +131,9 @@ const ShippingCSVUpload = ({
   });
 
   const handleUpload = async () => {
-    if (!file || !auth.currentUser) {
-      console.log("No file selected or user not authenticated");
-      toast.error("No file selected or you're not logged in");
+    if (!file) {
+      console.log("No file selected");
+      toast.error("No file selected");
       return;
     }
     
@@ -154,11 +155,20 @@ const ShippingCSVUpload = ({
     setUploadError('');
     setProcessingStatus('Preparing upload...');
     
+    // Set a timeout to abort if the upload takes too long
+    uploadTimeoutRef.current = setTimeout(() => {
+      setUploadError('Upload timed out after 30 seconds. Please try again.');
+      setIsLoading(false);
+      setProcessingStatus('');
+      onUploadComplete(false);
+      toast.error('Upload timed out after 30 seconds.');
+    }, 30000);
+    
     try {
       console.log("Starting upload process...");
       
       // First, store the file in Firebase Storage as backup
-      const storageRef = ref(storage, `shipping_data/${auth.currentUser.uid}/${Date.now()}-${file.name}`);
+      const storageRef = ref(storage, `shipping_data/${Date.now()}-${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
       
       uploadTask.on(
@@ -174,6 +184,11 @@ const ShippingCSVUpload = ({
           setUploadError('File upload failed. Please try again.');
           setIsLoading(false);
           setProcessingStatus('');
+          
+          if (uploadTimeoutRef.current) {
+            clearTimeout(uploadTimeoutRef.current);
+          }
+          
           onUploadComplete(false);
           toast.error('File upload failed. Please try again.');
         },
@@ -207,8 +222,7 @@ const ShippingCSVUpload = ({
                 }
                 
                 // Create a metadata document first
-                const userId = auth.currentUser!.uid;
-                const metaRef = collection(db, 'users', userId, 'shippingData_meta');
+                const metaRef = collection(db, 'shippingData_meta');
                 
                 const metaDoc = await addDoc(metaRef, {
                   filename: file.name,
@@ -230,7 +244,7 @@ const ShippingCSVUpload = ({
                 let recordCount = 0;
                 let recordsWithTrackingId = 0;
                 
-                const shippingCollection = collection(db, 'users', userId, 'shippingData');
+                const shippingCollection = collection(db, 'shippingData');
                 
                 for (let i = 0; i < parsedData.length; i++) {
                   // Commit the current batch and create a new one if we've reached the limit
@@ -261,6 +275,11 @@ const ShippingCSVUpload = ({
                   
                   // Clean and map the data
                   const cleanedData = cleanData(row, columnMapping);
+                  
+                  if (!cleanedData) {
+                    console.warn(`Row ${i} resulted in null data after cleaning, skipping`);
+                    continue;
+                  }
                   
                   // Add uploadId and timestamps
                   cleanedData.uploadId = metaDoc.id;
@@ -327,12 +346,18 @@ const ShippingCSVUpload = ({
                 }
                 
                 // Update metadata with valid tracking ID count
-                await addDoc(collection(db, 'users', userId, 'shippingData_stats'), {
+                await addDoc(collection(db, 'shippingData_stats'), {
                   uploadId: metaDoc.id,
                   totalRecords: recordCount,
                   recordsWithTrackingId: recordsWithTrackingId,
                   uploadDate: serverTimestamp()
                 });
+                
+                // Clear timeout as upload was successful
+                if (uploadTimeoutRef.current) {
+                  clearTimeout(uploadTimeoutRef.current);
+                  uploadTimeoutRef.current = null;
+                }
                 
                 // Finalize the upload
                 setProgress(100);
@@ -356,6 +381,12 @@ const ShippingCSVUpload = ({
                 }, 1500);
                 
               } catch (err: any) {
+                // Clear timeout on error
+                if (uploadTimeoutRef.current) {
+                  clearTimeout(uploadTimeoutRef.current);
+                  uploadTimeoutRef.current = null;
+                }
+                
                 console.error('Error processing CSV data:', err);
                 setUploadError(`Failed to process data: ${err.message}`);
                 setIsLoading(false);
@@ -365,6 +396,12 @@ const ShippingCSVUpload = ({
               }
             },
             error: function(err: any) {
+              // Clear timeout on error
+              if (uploadTimeoutRef.current) {
+                clearTimeout(uploadTimeoutRef.current);
+                uploadTimeoutRef.current = null;
+              }
+              
               console.error('Error parsing CSV:', err);
               setUploadError(`Failed to parse CSV: ${err.message}`);
               setIsLoading(false);
@@ -376,6 +413,12 @@ const ShippingCSVUpload = ({
         }
       );
     } catch (error: any) {
+      // Clear timeout on error
+      if (uploadTimeoutRef.current) {
+        clearTimeout(uploadTimeoutRef.current);
+        uploadTimeoutRef.current = null;
+      }
+      
       console.error('Error starting upload:', error);
       setUploadError(`Upload failed: ${error.message}`);
       setIsLoading(false);
@@ -384,6 +427,15 @@ const ShippingCSVUpload = ({
       toast.error(`Upload failed: ${error.message}`);
     }
   };
+
+  // Clean up timeout on component unmount
+  React.useEffect(() => {
+    return () => {
+      if (uploadTimeoutRef.current) {
+        clearTimeout(uploadTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -438,13 +490,18 @@ const ShippingCSVUpload = ({
             {uploadError && (
               <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
             )}
+            {!isLoading && !uploadSuccess && (
+              <Button variant="ghost" size="icon" onClick={() => setFile(null)} className="h-8 w-8">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           {isLoading && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span>{processingStatus || "Processing..."}</span>
-                <span>{progress}%</span>
+                <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>

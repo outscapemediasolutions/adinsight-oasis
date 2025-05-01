@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 
 interface ColumnMappingDialogProps {
   open: boolean;
@@ -15,6 +17,7 @@ interface ColumnMappingDialogProps {
 
 const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: ColumnMappingDialogProps) => {
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([]);
   
   const requiredFields = [
     { key: "orderId", label: "Order ID" },
@@ -76,18 +79,36 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
     });
     
     setMapping(autoMapping);
+    validateRequiredFields(autoMapping);
   }, [csvHeaders]);
   
-  const handleConfirm = () => {
-    // Check if all required fields are mapped
-    const unmappedRequired = requiredFields.filter(field => !mapping[field.key]);
+  // Validate that required fields are mapped
+  const validateRequiredFields = (currentMapping: Record<string, string>) => {
+    const missing = requiredFields
+      .filter(field => !currentMapping[field.key])
+      .map(field => field.label);
     
-    if (unmappedRequired.length > 0) {
-      toast.warning(`Please map these required fields: ${unmappedRequired.map(f => f.label).join(', ')}`);
+    setMissingRequiredFields(missing);
+    return missing.length === 0;
+  };
+  
+  // Handle field mapping change
+  const handleFieldChange = (fieldKey: string, value: string) => {
+    const newMapping = { ...mapping, [fieldKey]: value };
+    setMapping(newMapping);
+    validateRequiredFields(newMapping);
+  };
+  
+  const handleConfirm = () => {
+    // Validate before confirming
+    const missing = validateRequiredFields(mapping);
+    
+    if (!missing) {
+      toast.warning(`Please map all required fields before continuing`);
       return;
     }
     
-    // Ensure tracking ID is mapped as it's primary
+    // Ensure Tracking ID is mapped as it's primary
     if (!mapping['trackingId']) {
       toast.warning('Tracking ID is required as it\'s the primary identifier');
       return;
@@ -113,6 +134,15 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
           </DialogDescription>
         </DialogHeader>
         
+        {missingRequiredFields.length > 0 && (
+          <Alert variant="warning" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Please map these required fields: {missingRequiredFields.join(', ')}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <div className="grid gap-6 py-4">
           <div className="space-y-4">
             <h4 className="font-medium">Required Fields</h4>
@@ -123,12 +153,13 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
                 </Label>
                 <Select
                   value={mapping[field.key] || ""}
-                  onValueChange={(value) => setMapping({...mapping, [field.key]: value})}
+                  onValueChange={(value) => handleFieldChange(field.key, value)}
                 >
                   <SelectTrigger id={field.key}>
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="not-mapped">Not mapped</SelectItem>
                     {csvHeaders.map((header) => (
                       <SelectItem key={header} value={header}>
                         {header}
@@ -149,13 +180,13 @@ const ColumnMappingDialog = ({ open, onOpenChange, csvHeaders, onConfirm }: Colu
                 </Label>
                 <Select
                   value={mapping[field.key] || ""}
-                  onValueChange={(value) => setMapping({...mapping, [field.key]: value})}
+                  onValueChange={(value) => handleFieldChange(field.key, value)}
                 >
                   <SelectTrigger id={field.key}>
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem key="not-mapped" value="not-mapped">Not mapped</SelectItem>
+                    <SelectItem value="not-mapped">Not mapped</SelectItem>
                     {csvHeaders.map((header) => (
                       <SelectItem key={header} value={header}>
                         {header}
