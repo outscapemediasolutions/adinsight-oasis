@@ -243,9 +243,9 @@ export const calculateMetrics = (orders: ShippingOrder[]): ShippingMetrics => {
     if (order.shipDate) {
       if (order.shipDate instanceof Date) {
         dateObj = order.shipDate;
-      } else if (typeof order.shipDate === 'object' && 'toDate' in order.shipDate && typeof order.shipDate.toDate === 'function') {
+      } else if (typeof order.shipDate === 'object' && order.shipDate !== null && 'toDate' in order.shipDate && typeof (order.shipDate as any).toDate === 'function') {
         // Handle Firestore Timestamp objects
-        dateObj = order.shipDate.toDate();
+        dateObj = (order.shipDate as any).toDate();
       } else if (typeof order.shipDate === 'string') {
         // Try parsing string date
         dateObj = new Date(order.shipDate);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,7 @@ export interface ShippingOrder {
   productQuantity: number;
   customerName: string;
   customerEmail: string;
+  customerMobile: string;
   addressState: string;
   addressCity: string;
   paymentMethod: string;
@@ -59,6 +59,7 @@ export interface ShippingDocumentData extends DocumentData {
   productQuantity?: string | number;
   customerName?: string;
   customerEmail?: string;
+  customerMobile?: string;
   addressState?: string;
   addressCity?: string;
   paymentMethod?: string;
@@ -194,6 +195,7 @@ const ShippingDashboard = ({ dateRange }: ShippingDashboardProps) => {
           productQuantity: typeof data.productQuantity === 'string' ? parseInt(data.productQuantity) : Number(data.productQuantity || 0),
           customerName: String(data.customerName || ""),
           customerEmail: String(data.customerEmail || ""),
+          customerMobile: String(data.customerMobile || ""),
           addressState: String(data.addressState || ""),
           addressCity: String(data.addressCity || ""),
           paymentMethod: String(data.paymentMethod || ""),
