@@ -12,7 +12,8 @@ service cloud.firestore {
     
     // Check if user is super admin (by email)
     function isSuperAdmin() {
-      return request.auth.token.email == 'vimalbachani888@gmail.com';
+      return request.auth.token.email == 'vimalbachani888@gmail.com' ||
+             request.auth.token.email == 'vimalbachani236@gmail.com';
     }
     
     // Check if user has admin role
@@ -98,7 +99,7 @@ service cloud.firestore {
 These security rules implement role-based access control:
 
 1. **Super Admin Access**: 
-   - Identified by the email vimalbachani888@gmail.com
+   - Identified by the emails vimalbachani888@gmail.com AND vimalbachani236@gmail.com
    - Full access to all collections including user management
    - Can delete users
 

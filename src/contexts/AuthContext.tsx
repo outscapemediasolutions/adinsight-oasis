@@ -72,8 +72,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCurrentUser(user);
         
         if (user) {
-          // Check if user is the super admin
-          const isSuperAdmin = user.email === "vimalbachani888@gmail.com";
+          // Check if user is one of the super admins
+          const isSuperAdmin = user.email === "vimalbachani888@gmail.com" || user.email === "vimalbachani236@gmail.com";
           
           // Get user data from Firestore
           const data = await getUserData(user.uid);

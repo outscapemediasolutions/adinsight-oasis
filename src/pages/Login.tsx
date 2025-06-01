@@ -31,8 +31,8 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // First check if it's the super admin or has access
-      const isSuperAdmin = email === "vimalbachani888@gmail.com";
+      // Check if it's one of the super admins or has access
+      const isSuperAdmin = email === "vimalbachani888@gmail.com" || email === "vimalbachani236@gmail.com";
       
       if (!isSuperAdmin) {
         // Check if user has access to the app

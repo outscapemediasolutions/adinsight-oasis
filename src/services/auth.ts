@@ -1,4 +1,3 @@
-
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -98,22 +97,20 @@ export const getUserData = async (uid: string) => {
   }
 };
 
-// Check if user has access to the app
+// Updated to include both super admin emails
 export const checkUserAccess = async (email: string) => {
   try {
     if (!email) return false;
     
-    // Super admin always has access
-    if (email === "vimalbachani888@gmail.com") return true;
+    // Both super admin emails have access
+    if (email === "vimalbachani888@gmail.com" || email === "vimalbachani236@gmail.com") return true;
     
-    // Check if user exists in users collection
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("email", "==", email));
     const querySnapshot = await getDocs(q);
     
     if (!querySnapshot.empty) return true;
     
-    // Check if user is in any team
     const teamsRef = collection(db, "teams");
     const teamQuery = query(teamsRef, where("members", "array-contains", email));
     const teamSnapshot = await getDocs(teamQuery);
