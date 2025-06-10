@@ -10,7 +10,7 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Check if user is super admin (by email)
+    // Check if user is super admin (by email) - UNRESTRICTED ACCESS
     function isSuperAdmin() {
       return request.auth.token.email == 'vimalbachani888@gmail.com' ||
              request.auth.token.email == 'vimalbachani236@gmail.com';
@@ -27,54 +27,94 @@ service cloud.firestore {
       return isSuperAdmin() || isAdmin();
     }
     
+    // Check if user owns the resource
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
     // Users collection rules
     match /users/{userId} {
-      // Super admin can read all users
+      // Super admin can read ALL users without restrictions
       // Users can read their own document
       // Admins can read all users
-      allow read: if isAuthenticated() && (isSuperAdmin() || isAdmin() || request.auth.uid == userId);
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdmin() || isOwner(userId));
       
-      // Super admin can write to any user document
+      // Super admin can write/create/update ANY user document without restrictions
       // Regular users can only write to their own document
-      allow write: if isAuthenticated() && (isSuperAdmin() || request.auth.uid == userId);
+      // Admins can write to user documents but not admin documents
+      allow create: if isAuthenticated() && 
+                   (isSuperAdmin() || 
+                    (isOwner(userId) && request.resource.data.role == 'user'));
       
-      // Only super admin can delete users
-      allow delete: if isAuthenticated() && isSuperAdmin();
-      
-      // Only super admin can update roles to admin/super_admin
       allow update: if isAuthenticated() && 
                    (isSuperAdmin() || 
-                    (request.auth.uid == userId && 
+                    (isOwner(userId) && 
+                     // Users cannot promote themselves to admin/super_admin
                      !(request.resource.data.role == 'admin' || 
-                       request.resource.data.role == 'super_admin')));
-    }
-    
-    // Ad data rules
-    match /users/{userId}/ad_data/{docId} {
-      // Super admin and admin can read/write
-      // Regular users can only read their own
-      allow read: if isAuthenticated() && (isAdminOrSuperAdmin() || request.auth.uid == userId);
-      allow write: if isAuthenticated() && (isAdminOrSuperAdmin() || request.auth.uid == userId);
-    }
-    
-    // Upload history rules
-    match /users/{userId}/upload_history/{uploadId} {
-      allow read: if isAuthenticated() && (isAdminOrSuperAdmin() || request.auth.uid == userId);
-      allow write: if isAuthenticated() && (isAdminOrSuperAdmin() || request.auth.uid == userId);
-    }
-    
-    // Organization rules
-    match /organizations/{orgId} {
-      // Super admin and admin have full access
-      // Regular users have read access only
-      allow read: if isAuthenticated() && (isAdminOrSuperAdmin() || exists(/databases/$(database)/documents/users/$(request.auth.uid)));
-      allow write: if isAuthenticated() && isAdminOrSuperAdmin();
+                       request.resource.data.role == 'super_admin')) ||
+                    // Admins can update user roles but not to super_admin
+                    (isAdmin() && 
+                     request.resource.data.role != 'super_admin' &&
+                     resource.data.role != 'super_admin'));
       
-      // Campaign data - same rules as organization
+      // Only super admin can delete users (with restrictions on super admin accounts)
+      allow delete: if isAuthenticated() && isSuperAdmin() && 
+                   // Cannot delete super admin accounts
+                   resource.data.role != 'super_admin';
+    }
+    
+    // Ad data rules - Super admins have full access
+    match /users/{userId}/ad_data/{docId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || isOwner(userId));
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || isOwner(userId));
+    }
+    
+    // Upload history rules - Super admins have full access
+    match /users/{userId}/upload_history/{uploadId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || isOwner(userId));
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || isOwner(userId));
+    }
+    
+    // Organization rules - Super admins have unlimited access
+    match /organizations/{orgId} {
+      // Super admin has unrestricted read/write access
+      // Admin and authenticated users have read access
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || 
+                  exists(/databases/$(database)/documents/users/$(request.auth.uid)));
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin());
+      
+      // Campaign data - Super admins have full access
       match /campaignData/{document=**} {
-        allow read: if isAuthenticated() && (isAdminOrSuperAdmin() || exists(/databases/$(database)/documents/users/$(request.auth.uid)));
-        allow write: if isAuthenticated() && isAdminOrSuperAdmin();
+        allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || 
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)));
+        allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin());
       }
+    }
+    
+    // Teams collection - Super admins have full access
+    match /teams/{teamId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || 
+                  resource.data.members != null && request.auth.token.email in resource.data.members);
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin());
+    }
+    
+    // Analytics data - Super admins have full access
+    match /analytics/{document=**} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin() || 
+                  exists(/databases/$(database)/documents/users/$(request.auth.uid)));
+      allow write: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin());
+    }
+    
+    // Settings - Super admins have full access
+    match /settings/{document=**} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isAdminOrSuperAdmin());
+      allow write: if isAuthenticated() && isSuperAdmin();
+    }
+    
+    // System logs - Only super admins can access
+    match /system_logs/{document=**} {
+      allow read: if isAuthenticated() && isSuperAdmin();
+      allow write: if isAuthenticated() && isSuperAdmin();
     }
     
     // Default deny all other access
@@ -96,23 +136,38 @@ service cloud.firestore {
 
 ## Security Rules Explanation
 
-These security rules implement role-based access control:
+These updated security rules implement comprehensive role-based access control with **unrestricted super admin access**:
 
-1. **Super Admin Access**: 
-   - Identified by the emails vimalbachani888@gmail.com AND vimalbachani236@gmail.com
-   - Full access to all collections including user management
-   - Can delete users
+### **Super Admin Access (vimalbachani888@gmail.com & vimalbachani236@gmail.com)**:
+- **UNLIMITED** read/write access to ALL collections
+- Can create, read, update, and delete ANY document
+- Can manage user roles including creating other admins
+- Can delete users (except other super admins)
+- Access to system logs and settings
+- No restrictions whatsoever on data access
 
-2. **Admin Access**:
-   - Access to all collections except deleting users
-   - Can read all user data but cannot modify user roles
+### **Admin Access**:
+- Full access to most collections except system settings
+- Can manage regular users but not super admins
+- Cannot access system logs
+- Cannot delete users
 
-3. **User Access**:
-   - Can only read their own data and general campaign data
-   - Cannot write data or access user management
+### **User Access**:
+- Can only read their own data
+- Limited access to general campaign and analytics data
+- Cannot modify user roles or access user management
 
-4. **Default Access**:
-   - No access without authentication and proper role assignment
+### **Special Collections**:
+- `system_logs`: Only super admins
+- `settings`: Super admins for write, admins for read
+- `teams`: Based on membership with super admin override
+- `analytics`: General read access, admin+ write access
+
+### **Protection Features**:
+- Prevents super admin account deletion
+- Prevents users from self-promoting to admin
+- Maintains data isolation for regular users
+- Comprehensive audit trail support
 
 ## Testing These Rules
 
@@ -120,3 +175,11 @@ You can test these rules in the Firebase Console:
 1. Go to the Rules tab in Firestore Database
 2. Click "Rules Playground"
 3. Simulate requests with different user credentials to test access
+4. Test with both super admin emails to verify unrestricted access
+
+## Security Notes
+
+- Super admins have complete database access - use responsibly
+- All other users have appropriate restrictions
+- Super admin accounts cannot be deleted via these rules
+- Regular users cannot escalate their own privileges

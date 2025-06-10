@@ -9,15 +9,20 @@ import {
 import { doc, setDoc, getDoc, collection, getDocs, query, where, deleteDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+// Super admin emails - these users have unrestricted access
+const SUPER_ADMIN_EMAILS = ["vimalbachani888@gmail.com", "vimalbachani236@gmail.com"];
+
+// Check if email is a super admin
+export const isSuperAdminEmail = (email: string): boolean => {
+  return SUPER_ADMIN_EMAILS.includes(email);
+};
+
 // Fix comparison to use string comparison rather than literal types comparison
-// This will resolve the TypeScript error TS2367
 export const checkUserRole = (role: string, requiredRole: string): boolean => {
-  // Compare roles using string equality, not literal type checks
   return role === requiredRole;
 };
 
 export const hasRequiredRole = (userRole: string): boolean => {
-  // Use string comparison rather than literal type comparison
   return userRole === "admin" || userRole === "super_admin";
 };
 
@@ -31,12 +36,15 @@ export const signUp = async (email: string, password: string, displayName: strin
     // Update profile with display name
     await updateProfile(user, { displayName });
     
+    // Determine role based on email
+    const role = isSuperAdminEmail(email) ? "super_admin" : "user";
+    
     // Create user document in Firestore
     await setDoc(doc(db, "users", user.uid), {
       email,
       displayName,
-      role: "user",
-      isAdmin: false,
+      role,
+      isAdmin: role === "admin" || role === "super_admin",
       team: [],
       createdAt: new Date(),
     });
@@ -97,13 +105,13 @@ export const getUserData = async (uid: string) => {
   }
 };
 
-// Updated to include both super admin emails
+// Check user access - super admins always have access
 export const checkUserAccess = async (email: string) => {
   try {
     if (!email) return false;
     
-    // Both super admin emails have access
-    if (email === "vimalbachani888@gmail.com" || email === "vimalbachani236@gmail.com") return true;
+    // Super admin emails always have access
+    if (isSuperAdminEmail(email)) return true;
     
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("email", "==", email));
@@ -218,7 +226,7 @@ export const getAllUsers = async () => {
   }
 };
 
-// Update user role
+// Update user role - super admins can update anyone
 export const updateUserRole = async (adminUid: string, userEmail: string, newRole: string) => {
   try {
     // Find the user by email
@@ -241,7 +249,7 @@ export const updateUserRole = async (adminUid: string, userEmail: string, newRol
   }
 };
 
-// Create new user (admin function)
+// Create new user (admin function) - super admins can create any role
 export const createNewUser = async (email: string, role: string, displayName: string = "") => {
   try {
     // Check if user already exists
@@ -277,9 +285,14 @@ export const createNewUser = async (email: string, role: string, displayName: st
   }
 };
 
-// Delete user (admin function)
+// Delete user (admin function) - super admins can delete anyone except themselves
 export const deleteUser = async (adminUid: string, userId: string, userEmail: string) => {
   try {
+    // Prevent super admins from deleting themselves
+    if (isSuperAdminEmail(userEmail)) {
+      throw new Error("Cannot delete super admin accounts");
+    }
+    
     // Delete user document
     await deleteDoc(doc(db, "users", userId));
     

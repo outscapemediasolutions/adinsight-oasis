@@ -12,7 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, userRole, hasAccess } = useAuth();
+  const { currentUser, userRole, hasAccess, isSuperAdmin } = useAuth();
   const isMobile = useIsMobile();
   
   // Define all possible menu items
@@ -29,8 +29,8 @@ const AppSidebar = () => {
   
   // Filter menu items based on user role
   const menuItems = allMenuItems.filter(item => {
-    // Super admin can see everything
-    if (userRole === "super_admin") return true;
+    // Super admin can see everything - no restrictions
+    if (isSuperAdmin || userRole === "super_admin") return true;
     
     // Admin can see everything except User Management
     if (userRole === "admin") {
@@ -63,6 +63,13 @@ const AppSidebar = () => {
     <div className="w-[240px] h-full bg-[#021120] border-r border-white/10 flex flex-col">
       <div className="p-6">
         <h1 className="text-adpulse-green text-2xl font-bold">D2C Scaler</h1>
+        {isSuperAdmin && (
+          <div className="mt-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+              Super Admin
+            </span>
+          </div>
+        )}
       </div>
       
       <nav className="flex-1 px-3">

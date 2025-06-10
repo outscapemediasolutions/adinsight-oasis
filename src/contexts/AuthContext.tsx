@@ -24,6 +24,7 @@ interface AuthContextInterface {
   adminUser: any | null; // Admin user data if current user is a team member
   userRole: "super_admin" | "admin" | "user" | null;
   hasAccess: (section: string) => boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextInterface>({
@@ -33,6 +34,7 @@ const AuthContext = createContext<AuthContextInterface>({
   adminUser: null,
   userRole: null,
   hasAccess: () => false,
+  isSuperAdmin: false,
 });
 
 export const useAuth = () => {
@@ -45,13 +47,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<any | null>(null);
   const [userRole, setUserRole] = useState<"super_admin" | "admin" | "user" | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Function to check if user has access to a specific section
   const hasAccess = (section: string): boolean => {
     if (!userRole) return false;
 
-    // Super admin has access to everything
-    if (userRole === "super_admin") return true;
+    // Super admin has access to EVERYTHING with no restrictions
+    if (userRole === "super_admin" || isSuperAdmin) return true;
 
     // Admin has access to everything except User Management
     if (userRole === "admin") {
@@ -73,14 +76,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (user) {
           // Check if user is one of the super admins
-          const isSuperAdmin = user.email === "vimalbachani888@gmail.com" || user.email === "vimalbachani236@gmail.com";
+          const superAdminEmails = ["vimalbachani888@gmail.com", "vimalbachani236@gmail.com"];
+          const isSuperAdminEmail = superAdminEmails.includes(user.email || "");
+          setIsSuperAdmin(isSuperAdminEmail);
           
           // Get user data from Firestore
           const data = await getUserData(user.uid);
           setUserData(data as UserData | null);
           
-          // Check if user has access
-          if (!isSuperAdmin) {
+          // Check if user has access (super admins always have access)
+          if (!isSuperAdminEmail) {
             const hasAccess = await checkUserAccess(user.email || "");
             if (!hasAccess) {
               toast.error("Access denied: You are not authorized to use this app");
@@ -89,13 +94,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setUserData(null);
               setAdminUser(null);
               setUserRole(null);
+              setIsSuperAdmin(false);
               setLoading(false);
               return;
             }
           }
           
-          // Set user role
-          if (isSuperAdmin) {
+          // Set user role with super admin priority
+          if (isSuperAdminEmail) {
             setUserRole("super_admin");
           } else if (data?.role) {
             setUserRole(data.role);
@@ -105,8 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUserRole("user");
           }
           
-          // Check if user is a team member
-          if (data && !data.isAdmin && userRole === "user") {
+          // Check if user is a team member (only for non-super-admins)
+          if (data && !data.isAdmin && !isSuperAdminEmail && userRole === "user") {
             const adminData = await checkTeamMembership(user.email || "");
             setAdminUser(adminData);
           } else {
@@ -116,6 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserData(null);
           setAdminUser(null);
           setUserRole(null);
+          setIsSuperAdmin(false);
         }
       } catch (error) {
         console.error("Error in auth state change:", error);
@@ -134,7 +141,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     adminUser,
     userRole,
-    hasAccess
+    hasAccess,
+    isSuperAdmin
   };
 
   return (
