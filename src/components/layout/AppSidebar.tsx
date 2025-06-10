@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { BarChart3, FileUp, Home, LogOut, Settings, Users, UserCog, ShoppingBag, Truck } from "lucide-react";
@@ -15,6 +14,8 @@ const AppSidebar = () => {
   const { currentUser, userRole, hasAccess, isSuperAdmin } = useAuth();
   const isMobile = useIsMobile();
   
+  console.log("AppSidebar - userRole:", userRole, "isSuperAdmin:", isSuperAdmin);
+  
   // Define all possible menu items
   const allMenuItems = [
     { icon: Home, label: "Dashboard", path: "/", access: "dashboard" },
@@ -29,17 +30,26 @@ const AppSidebar = () => {
   
   // Filter menu items based on user role
   const menuItems = allMenuItems.filter(item => {
-    // Super admin can see everything - no restrictions
-    if (isSuperAdmin || userRole === "super_admin") return true;
+    // Super admin can see EVERYTHING - absolutely no restrictions
+    if (isSuperAdmin || userRole === "super_admin") {
+      console.log("Super admin - showing all menu items");
+      return true;
+    }
     
     // Admin can see everything except User Management
     if (userRole === "admin") {
-      return item.access !== "userManagement";
+      const canSee = item.access !== "userManagement";
+      console.log("Admin - can see", item.label, ":", canSee);
+      return canSee;
     }
     
     // Regular users can only see Dashboard and Analytics
-    return hasAccess(item.access);
+    const canSee = hasAccess(item.access);
+    console.log("User - can see", item.label, ":", canSee);
+    return canSee;
   });
+  
+  console.log("Filtered menu items:", menuItems.map(item => item.label));
   
   const isActive = (path: string) => {
     if (path === "/" && location.pathname === "/dashboard") return true;

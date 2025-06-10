@@ -1,3 +1,4 @@
+
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -15,15 +16,6 @@ const SUPER_ADMIN_EMAILS = ["vimalbachani888@gmail.com", "vimalbachani236@gmail.
 // Check if email is a super admin
 export const isSuperAdminEmail = (email: string): boolean => {
   return SUPER_ADMIN_EMAILS.includes(email);
-};
-
-// Fix comparison to use string comparison rather than literal types comparison
-export const checkUserRole = (role: string, requiredRole: string): boolean => {
-  return role === requiredRole;
-};
-
-export const hasRequiredRole = (userRole: string): boolean => {
-  return userRole === "admin" || userRole === "super_admin";
 };
 
 // Sign up new user
