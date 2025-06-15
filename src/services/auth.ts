@@ -1,4 +1,3 @@
-
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -29,7 +28,7 @@ export const signUp = async (email: string, password: string, displayName: strin
     await updateProfile(user, { displayName });
     
     // Determine role based on email (add logic if you want admin support)
-    let role: "super_admin" | "admin" | "user" = "user";
+    let role: "super_admin" | "user" = "user";
     if (isSuperAdminEmail(email)) {
       role = "super_admin";
     }
@@ -40,7 +39,7 @@ export const signUp = async (email: string, password: string, displayName: strin
       email,
       displayName,
       role,
-      isAdmin: role === "admin" || role === "super_admin",
+      isAdmin: role === "super_admin",
       team: [],
       createdAt: new Date(),
     });
