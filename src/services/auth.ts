@@ -28,9 +28,13 @@ export const signUp = async (email: string, password: string, displayName: strin
     // Update profile with display name
     await updateProfile(user, { displayName });
     
-    // Determine role based on email
-    const role = isSuperAdminEmail(email) ? "super_admin" : "user";
-    
+    // Determine role based on email (add logic if you want admin support)
+    let role: "super_admin" | "admin" | "user" = "user";
+    if (isSuperAdminEmail(email)) {
+      role = "super_admin";
+    }
+    // Optionally, set admin by email domain or criteria here if you require admin users
+
     // Create user document in Firestore
     await setDoc(doc(db, "users", user.uid), {
       email,
